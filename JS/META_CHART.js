@@ -286,8 +286,17 @@ document.addEventListener("DOMContentLoaded",()=>{
    const result=await r.json();
    if(result.error)throw new Error(result.error);
 
-   const candles=result.candles||[];
-   window.allData=candles.map(d=>[d.open_time,d.open,d.high,d.low,d.close,d.volume].map(Number));
+   const candles = result.candles || [];
+   window.allData = candles.map(d => {
+       // Object эсвэл массив аль нь ч байсан алдаа гаргахгүйгээр салгаж авах
+       const time = d.open_time || d[0];
+       const open = d.open || d[1];
+       const high = d.high || d[2];
+       const low = d.low || d[3];
+       const close = d.close || d[4];
+       const volume = d.volume || d[5];
+       return [Number(time), Number(open), Number(high), Number(low), Number(close), Number(volume)];
+   });
    window.rsiArrayData=candles.map(d=>finNum(d.rsi));
    window.macdArrayData=candles.map(d=>finNum(d.macd_line));
    window.signalArrayData=candles.map(d=>finNum(d.macd_signal));
