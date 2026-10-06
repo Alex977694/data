@@ -278,33 +278,38 @@ document.addEventListener("DOMContentLoaded",()=>{
 
  window.redrawChart=draw;
 
- async function fetchCandles(){
-  try{
-   interval="1m";symbol="GOLD";
-   const r=await fetch("/candles/GOLD");
-   if(!r.ok)throw new Error(`HTTP ${r.status}`);
-   const result=await r.json();
-   if(result.error)throw new Error(result.error);
+async function fetchCandles(){
+ try{
+    interval = "1m"; 
+    symbol = "GOLD";
+    
+    // Энэ хаяг сервер дээр байгаа эсэхийг сайтар шалгах (Том жижиг үсэг анхаарах)
+    const r = await fetch("/candles/GOLD"); 
+    
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    const result = await r.json();
+    if(result.error) throw new Error(result.error);
 
-   const candles = result.candles || [];
-   window.allData = candles.map(d => {
-       // Object эсвэл массив аль нь ч байсан алдаа гаргахгүйгээр салгаж авах
-       const time = d.open_time || d[0];
-       const open = d.open || d[1];
-       const high = d.high || d[2];
-       const low = d.low || d[3];
-       const close = d.close || d[4];
-       const volume = d.volume || d[5];
-       return [Number(time), Number(open), Number(high), Number(low), Number(close), Number(volume)];
-   });
-   window.rsiArrayData=candles.map(d=>finNum(d.rsi));
-   window.macdArrayData=candles.map(d=>finNum(d.macd_line));
-   window.signalArrayData=candles.map(d=>finNum(d.macd_signal));
-   window.histArrayData=candles.map(d=>finNum(d.macd_histogram));
-   draw();
-   dispatchChartUpdate();
-  }catch(e){console.error("[META CHART / FLASK DATA ERROR]",e)}
- }
+    const candles = result.candles || [];
+    window.allData = candles.map(d => {
+        const time = d.open_time || d[0];
+        const open = d.open || d[1];
+        const high = d.high || d[2];
+        const low = d.low || d[3];
+        const close = d.close || d[4];
+        const volume = d.volume || d[5];
+        return [Number(time), Number(open), Number(high), Number(low), Number(close), Number(volume)];
+    });
+
+    window.rsiArrayData = candles.map(d => finNum(d.rsi));
+    window.macdArrayData = candles.map(d => finNum(d.macd_line));
+    window.signalArrayData = candles.map(d => finNum(d.macd_signal));
+    window.histArrayData = candles.map(d => finNum(d.macd_histogram));
+    
+    draw();
+    dispatchChartUpdate();
+ }catch(e){console.error("[META CHART / FLASK DATA ERROR]",e)}
+}
 
  async function fetchBacktest(){
   try{
