@@ -753,16 +753,19 @@ def stop_trade_bot():
     return {"status": "real trade bot stop signal sent"}
 # ==================== MT5 GOLD DATA ENDPOINT ====================
 
-
+# Зах зээлийн Ask, Bid ханшийг хадгалах глобал dictionary (хэрэв байхгүй бол файлаасаа харна уу)
+market_quotes = {}
 
 @app.post("/update-gold")
 def receive_gold_candles(data: dict):
     """
     Локал дээр ажиллаж буй MT5 bridge скриптээс Gold (XAUUSD)-ийн 
-    10,000 хүртэлх лааны датаг хүлээж авч RAM cache руу хийх Endpoint.
+    10,000 хүртэлх лааны дата болон Ask/Bid үнийг хүлээж авч RAM cache руу хийх Endpoint.
     """
     symbol = data.get("symbol", "XAUUSD").upper()
     candles = data.get("candles", [])
+    ask_price = data.get("ask", 0.0)
+    bid_price = data.get("bid", 0.0)
     
     if not candles:
         raise HTTPException(status_code=400, detail="Candles data is empty")
@@ -781,9 +784,20 @@ def receive_gold_candles(data: dict):
 
         with cache_lock:
             kline_history[symbol] = formatted_candles
+            # Ask, Bid ханшийг энд хамт хадгалж авна
+            market_quotes[symbol] = {
+                "ask": ask_price,
+                "bid": bid_price
+            }
             
-        print(f"[GOLD UPDATE] Successfully loaded {len(formatted_candles)} candles for {symbol}")
-        return {"status": "success", "symbol": symbol, "loaded_candles": len(formatted_candles)}
+        print(f"[GOLD UPDATE] Successfully loaded {len(formatted_candles)} candles for {symbol} | Ask: {ask_price}, Bid: {bid_price}")
+        return {
+            "status": "success", 
+            "symbol": symbol, 
+            "loaded_candles": len(formatted_candles),
+            "ask": ask_price,
+            "bid": bid_price
+        }
     
     except Exception as e:
         print(f"[GOLD ERROR] Failed to process gold candles: {e}")
