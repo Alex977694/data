@@ -310,7 +310,7 @@ async function fetchCandles(){
     }
 
     if(arraysRes.ok) {
-        const arraysJson = await arraysRes.json();
+        const arraysJson = await arraysJson.json();
         window.macdArrayData = arraysJson.macd_line_array || [];
         window.signalArrayData = arraysJson.macd_signal_array || [];
         window.histArrayData = arraysJson.macd_histogram_array || [];
@@ -319,14 +319,13 @@ async function fetchCandles(){
     draw();
     dispatchChartUpdate();
 
-    // ЭНД Live WebSocket-г зааж өгч ажиллуулна!
-    initLiveWebSocket(symbol);
+    // ЭНД Live Polling-г ажиллуулна (Python script-ээс ирж буй шинэ үнийг автоматаар татна)
+    startLivePolling(symbol);
 
  }catch(e){console.error("[META CHART / FLASK DATA ERROR]",e)}
 }
 
-// Binance WebSocket-оор Live үнэ болон лааг шинэчлэх
-// Серверээсээ 2 секунд тутамд сүүлийн лааны датаг татаж live болгох
+// Server-ээс шинэ датаг секунд тутамд татаж график руу шинэчлэх
 function startLivePolling(symbol) {
     setInterval(async () => {
         try {
@@ -335,22 +334,17 @@ function startLivePolling(symbol) {
                 const data = await res.json();
                 const candles = data.candles || [];
                 if(candles.length > 0) {
-                    // Сүүлийн лааг шинэчлэх
-                    const latest = candles[candles.length - 1];
-                    const lastIdx = window.allData.length - 1;
-                    
-                    if(window.allData[lastIdx][0] === latest[0]) {
-                        window.allData[lastIdx] = latest.map(Number);
-                    } else {
-                        window.allData.push(latest.map(Number));
-                    }
-                    draw();
+                    window.allData = candles.map(d => [
+                        Number(d[0]), Number(d[1]), Number(d[2]), Number(d[3]), Number(d[4]), Number(d[5])
+                    ]);
+                    // Хэрэв та RSI, MACD массивуудыг мөн live татах бол энд хамт fetch хийж болно
+                    draw(); // Графикийг дахин шинээр зурах
                 }
             }
         } catch(e) {
             console.error("[LIVE POLLING ERROR]", e);
         }
-    }, 2000); // 2 секунд тутамд сервер рүү хүсэлт явуулж шинэчилнэ
+    }, 1500); // 1.5 секунд тутамд серверээс шинэ дата татна
 }
  
  async function fetchBacktest(){
