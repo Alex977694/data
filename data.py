@@ -388,6 +388,7 @@ def get_symbol_candles(symbol: str):
     symbol = symbol.upper()
     with cache_lock:
         if symbol in kline_history:
+            print("SERVER DATA CHECK:", kline_history[symbol][0])
             return {"symbol": symbol, "candles": kline_history[symbol]}
     raise HTTPException(status_code=404, detail="Symbol not found or not loaded yet")
     
