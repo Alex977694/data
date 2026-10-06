@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Meta Chart</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            background: #05070a;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        #app {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            background: #05070a;
+        }
+
+        /* =========================
+           TOP BAR
+        ========================= */
+
+        #topbar {
+            height: 48px;
+            flex: 0 0 48px;
+
+            display: flex;
+            align-items: center;
+            gap: 8px;
+
+            padding: 0 12px;
+
+            background: #0b0f14;
+            border-bottom: 1px solid #1f2630;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .control-label {
+            color: #777;
+            font-size: 11px;
+        }
+
+        select,
+        input,
+        button {
+            height: 30px;
+
+            background: #11161d;
+            color: #ddd;
+
+            border: 1px solid #29313c;
+            border-radius: 4px;
+
+            padding: 0 9px;
+
+            outline: none;
+        }
+
+        select:focus,
+        input:focus,
+        button:focus {
+            border-color: #2962ff;
+        }
+
+        button {
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1a212b;
+        }
+
+        .green-btn {
+            color: #0ecb81;
+            border-color: #0ecb81;
+        }
+
+        .red-btn {
+            color: #f6465d;
+            border-color: #f6465d;
+        }
+
+        /* =========================
+           MAIN
+        ========================= */
+
+        #main {
+            flex: 1;
+            min-height: 0;
+
+            display: flex;
+        }
+
+        /* =========================
+           CHART
+        ========================= */
+
+        #chart-area {
+            flex: 1;
+            min-width: 0;
+            min-height: 0;
+
+            position: relative;
+
+            background: #000;
+        }
+
+        #metaChartContainer {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* =========================
+           RIGHT SETTINGS PANEL
+        ========================= */
+
+        #settings {
+            width: 230px;
+            flex: 0 0 230px;
+
+            background: #0b0f14;
+            border-left: 1px solid #1f2630;
+
+            padding: 12px;
+
+            overflow-y: auto;
+        }
+
+        .section {
+            margin-bottom: 18px;
+        }
+
+        .section-title {
+            margin-bottom: 10px;
+
+            color: #aaa;
+            font-size: 11px;
+            font-weight: bold;
+
+            text-transform: uppercase;
+            letter-spacing: .5px;
+        }
+
+        .setting-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+
+            gap: 8px;
+
+            margin-bottom: 8px;
+        }
+
+        .setting-row label {
+            color: #888;
+            font-size: 12px;
+        }
+
+        .setting-row input,
+        .setting-row select {
+            width: 90px;
+        }
+
+        /* =========================
+           INDICATOR BUTTONS
+        ========================= */
+
+        .indicator-buttons {
+            display: flex;
+            gap: 4px;
+        }
+
+        .indicator-buttons button {
+            flex: 1;
+
+            height: 26px;
+
+            padding: 0;
+
+            color: #888;
+            font-size: 10px;
+        }
+
+        .indicator-buttons button.active {
+            background: #1f2630;
+            color: #fff;
+            border-color: #555;
+        }
+
+        /* =========================
+           BACKTEST
+        ========================= */
+
+        #backtestStatus {
+            margin-top: 8px;
+
+            padding: 8px;
+
+            background: #080b0f;
+            border: 1px solid #1f2630;
+            border-radius: 4px;
+
+            color: #777;
+            font-size: 11px;
+            line-height: 1.5;
+        }
+
+        .status-ok {
+            color: #0ecb81;
+        }
+
+        .status-error {
+            color: #f6465d;
+        }
+
+        /* =========================
+           MOBILE
+        ========================= */
+
+        @media (max-width: 800px) {
+
+            #settings {
+                width: 190px;
+                flex-basis: 190px;
+            }
+
+            #topbar {
+                gap: 4px;
+                padding: 0 6px;
+            }
+
+            .control-label {
+                display: none;
+            }
+        }
+
+        @media (max-width: 600px) {
+
+            #settings {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div id="app">
+
+    <!-- =========================================
+         TOP BAR
+    ========================================== -->
+
+    <div id="topbar">
+
+        <div class="control-group">
+            <span class="control-label">Market</span>
+
+            <select id="market">
+                <option value="gold">Gold</option>
+            </select>
+        </div>
+
+
+        <div class="control-group">
+            <span class="control-label">Coin</span>
+
+            <input
+                id="coin"
+                type="text"
+                value="GOLD"
+                autocomplete="off"
+            >
+        </div>
+
+
+        <div class="control-group">
+            <span class="control-label">Interval</span>
+
+            <select id="interval">
+                <option value="1m">1m</option>
+                <option value="5m">5m</option>
+                <option value="15m">15m</option>
+                <option value="30m">30m</option>
+                <option value="1h">1h</option>
+                <option value="4h">4h</option>
+                <option value="1d">1d</option>
+            </select>
+        </div>
+
+
+        <div style="flex:1"></div>
+
+
+        <button
+            id="reloadBtn"
+            type="button"
+        >
+            ↻ Reload
+        </button>
+
+    </div>
+
+
+    <!-- =========================================
+         MAIN
+    ========================================== -->
+
+    <div id="main">
+
+        <!-- =====================================
+             CHART
+        ====================================== -->
+
+        <div id="chart-area">
+
+            <div id="metaChartContainer"></div>
+
+        </div>
+
+
+        <!-- =====================================
+             SETTINGS
+        ====================================== -->
+
+        <aside id="settings">
+
+            <!-- INDICATORS -->
+
+            <div class="section">
+
+                <div class="section-title">
+                    Indicators
+                </div>
+
+
+                <!-- MACD -->
+
+                <div class="setting-row">
+                    <label>MACD Fast</label>
+
+                    <input
+                        id="macdFast"
+                        type="number"
+                        value="12"
+                        min="1"
+                        max="200"
+                    >
+                </div>
+
+
+                <div class="setting-row">
+                    <label>MACD Slow</label>
+
+                    <input
+                        id="macdSlow"
+                        type="number"
+                        value="26"
+                        min="2"
+                        max="300"
+                    >
+                </div>
+
+
+                <div class="setting-row">
+                    <label>MACD Signal</label>
+
+                    <input
+                        id="macdSignal"
+                        type="number"
+                        value="9"
+                        min="1"
+                        max="100"
+                    >
+                </div>
+
+
+                <!-- RSI -->
+
+                <div class="setting-row">
+                    <label>RSI Period</label>
+
+                    <input
+                        id="rsiPeriod"
+                        type="number"
+                        value="7"
+                        min="1"
+                        max="100"
+                    >
+                </div>
+
+
+                <!-- ATR -->
+
+                <div class="setting-row">
+                    <label>ATR Period</label>
+
+                    <input
+                        id="atrPeriod"
+                        type="number"
+                        value="14"
+                        min="1"
+                        max="100"
+                    >
+                </div>
+
+            </div>
+
+
+            <!-- PANEL SIZE -->
+
+            <div class="section">
+
+                <div class="section-title">
+                    Panel Size
+                </div>
+
+
+                <div class="setting-row">
+                    <label>MACD</label>
+
+                    <div class="indicator-buttons">
+
+                        <button
+                            type="button"
+                            data-indicator="macd"
+                            data-mode="max"
+                        >
+                            ▲
+                        </button>
+
+                        <button
+                            type="button"
+                            data-indicator="macd"
+                            data-mode="normal"
+                            class="active"
+                        >
+                            ■
+                        </button>
+
+                        <button
+                            type="button"
+                            data-indicator="macd"
+                            data-mode="min"
+                        >
+                            ▼
+                        </button>
+
+                    </div>
+                </div>
+
+
+                <div class="setting-row">
+                    <label>RSI</label>
+
+                    <div class="indicator-buttons">
+
+                        <button
+                            type="button"
+                            data-indicator="rsi"
+                            data-mode="max"
+                        >
+                            ▲
+                        </button>
+
+                        <button
+                            type="button"
+                            data-indicator="rsi"
+                            data-mode="normal"
+                            class="active"
+                        >
+                            ■
+                        </button>
+
+                        <button
+                            type="button"
+                            data-indicator="rsi"
+                            data-mode="min"
+                        >
+                            ▼
+                        </button>
+
+                    </div>
+                </div>
+
+
+                <div class="setting-row">
+                    <label>ATR</label>
+
+                    <div class="indicator-buttons">
+
+                        <button
+                            type="button"
+                            data-indicator="atr"
+                            data-mode="max"
+                        >
+                            ▲
+                        </button>
+
+                        <button
+                            type="button"
+                            data-indicator="atr"
+                            data-mode="normal"
+                            class="active"
+                        >
+                            ■
+                        </button>
+
+                        <button
+                            type="button"
+                            data-indicator="atr"
+                            data-mode="min"
+                        >
+                            ▼
+                        </button>
+
+                    </div>
+                </div>
+
+            </div>
+
+
+            <!-- BACKTEST -->
+
+            <div class="section">
+
+                <div class="section-title">
+                    Backtest
+                </div>
+
+
+                <div class="setting-row">
+
+                    <label>Show</label>
+
+                    <button
+                        id="backtestToggle"
+                        type="button"
+                        class="green-btn"
+                    >
+                        ON
+                    </button>
+
+                </div>
+
+
+                <button
+                    id="backtestReload"
+                    type="button"
+                    style="width:100%;"
+                >
+                    Reload Backtest
+                </button>
+
+
+                <div id="backtestStatus">
+                    Waiting...
+                </div>
+
+            </div>
+
+
+            <!-- CHART RESET -->
+
+            <div class="section">
+
+                <div class="section-title">
+                    Chart
+                </div>
+
+                <button
+                    id="resetChart"
+                    type="button"
+                    style="width:100%;"
+                >
+                    Reset View
+                </button>
+
+            </div>
+
+        </aside>
+
+    </div>
+
+</div>
+
+
+<!-- =========================================
+     CHART CONFIG
+========================================== -->
+
+<script>
+
+    /*
+     * meat_chart.js-ээс өмнө тохиргоог үүсгэнэ.
+     *
+     * meat_chart.js:
+     *   typeof indicatorSettings !== "undefined"
+     * гэж ашиглаж байгаа учраас энд global object өгч байна.
+     */
+
+    window.indicatorSettings = {
+
+        macdFast: 12,
+        macdSlow: 26,
+        macdSignal: 9,
+
+        rsiPeriod: 7,
+
+        atrPeriod: 14
+    };
+
+
+    /*
+     * Indicator panel-ийн default state
+     */
+
+    window.macdMode = "normal";
+    window.rsiMode = "normal";
+    window.atrMode = "normal";
+
+
+    /*
+     * Backtest default
+     */
+
+    window.backtestVisible = true;
+
+</script>
+
+
+<!-- =========================================
+     MAIN CHART JS
+========================================== -->
+
+<script src="/static/js/meat_chart.js"></script>
+
+
+<!-- =========================================
+     HTML CONTROLS
+========================================== -->
+
+<script>
+
+document.addEventListener("DOMContentLoaded", () => {
+
+    /*
+     * -----------------------------
+     * Helpers
+     * -----------------------------
+     */
+
+    function redraw() {
+
+        if (typeof window.redrawChart === "function") {
+            window.redrawChart();
+        }
+
+    }
+
+
+    function updateIndicatorSettings() {
+
+        const getNumber = (id, fallback) => {
+
+            const el = document.getElementById(id);
+
+            if (!el) return fallback;
+
+            const n = Number(el.value);
+
+            return Number.isFinite(n) && n > 0
+                ? n
+                : fallback;
+        };
+
+
+        window.indicatorSettings.macdFast =
+            getNumber("macdFast", 12);
+
+        window.indicatorSettings.macdSlow =
+            getNumber("macdSlow", 26);
+
+        window.indicatorSettings.macdSignal =
+            getNumber("macdSignal", 9);
+
+        window.indicatorSettings.rsiPeriod =
+            getNumber("rsiPeriod", 7);
+
+        window.indicatorSettings.atrPeriod =
+            getNumber("atrPeriod", 14);
+
+
+        redraw();
+    }
+
+
+    /*
+     * -----------------------------
+     * Indicator settings
+     * -----------------------------
+     */
+
+    [
+        "macdFast",
+        "macdSlow",
+        "macdSignal",
+        "rsiPeriod",
+        "atrPeriod"
+    ].forEach(id => {
+
+        const el = document.getElementById(id);
+
+        if (!el) return;
+
+        el.addEventListener("change", updateIndicatorSettings);
+
+        el.addEventListener("keydown", e => {
+
+            if (e.key === "Enter") {
+                updateIndicatorSettings();
+            }
+
+        });
+
+    });
+
+
+    /*
+     * -----------------------------
+     * Panel size buttons
+     * -----------------------------
+     */
+
+    document.querySelectorAll(
+        "[data-indicator][data-mode]"
+    ).forEach(btn => {
+
+        btn.addEventListener("click", () => {
+
+            const indicator =
+                btn.dataset.indicator;
+
+            const mode =
+                btn.dataset.mode;
+
+
+            /*
+             * Бусад indicator-ийг normal болгоно.
+             * Чиний одоогийн JS-ийн resetModes-тэй адил.
+             */
+
+            window.macdMode = "normal";
+            window.rsiMode = "normal";
+            window.atrMode = "normal";
+
+
+            if (indicator === "macd") {
+                window.macdMode = mode;
+            }
+
+            if (indicator === "rsi") {
+                window.rsiMode = mode;
+            }
+
+            if (indicator === "atr") {
+                window.atrMode = mode;
+            }
+
+
+            /*
+             * Active button UI
+             */
+
+            document.querySelectorAll(
+                "[data-indicator]"
+            ).forEach(x => {
+                x.classList.remove("active");
+            });
+
+
+            document.querySelectorAll(
+                `[data-indicator="${indicator}"]`
+            ).forEach(x => {
+
+                if (x.dataset.mode === mode) {
+                    x.classList.add("active");
+                }
+
+            });
+
+
+            redraw();
+
+        });
+
+    });
+
+
+    /*
+     * -----------------------------
+     * Backtest toggle
+     * -----------------------------
+     */
+
+    const backtestToggle =
+        document.getElementById("backtestToggle");
+
+    if (backtestToggle) {
+
+        backtestToggle.addEventListener("click", () => {
+
+            window.backtestVisible =
+                !window.backtestVisible;
+
+
+            backtestToggle.textContent =
+                window.backtestVisible
+                    ? "ON"
+                    : "OFF";
+
+
+            backtestToggle.classList.toggle(
+                "green-btn",
+                window.backtestVisible
+            );
+
+            backtestToggle.classList.toggle(
+                "red-btn",
+                !window.backtestVisible
+            );
+
+
+            redraw();
+
+        });
+
+    }
+
+
+    /*
+     * -----------------------------
+     * Backtest reload
+     * -----------------------------
+     */
+
+    const backtestReload =
+        document.getElementById("backtestReload");
+
+    const backtestStatus =
+        document.getElementById("backtestStatus");
+
+
+    async function loadBacktest() {
+
+        if (backtestStatus) {
+            backtestStatus.textContent =
+                "Loading backtest...";
+            backtestStatus.className = "";
+        }
+
+
+        try {
+
+            const response =
+                await fetch("/api/backtest");
+
+
+            if (!response.ok) {
+                throw new Error(
+                    `HTTP ${response.status}`
+                );
+            }
+
+
+            const result =
+                await response.json();
+
+
+            window.backtestEvents =
+                Array.isArray(result.events)
+                    ? result.events
+                    : [];
+
+
+            if (backtestStatus) {
+
+                backtestStatus.textContent =
+                    `Loaded: ${window.backtestEvents.length} events`;
+
+                backtestStatus.className =
+                    "status-ok";
+
+            }
+
+
+            redraw();
+
+        } catch (error) {
+
+            console.error(
+                "[BACKTEST]",
+                error
+            );
+
+
+            window.backtestEvents = [];
+
+
+            if (backtestStatus) {
+
+                backtestStatus.textContent =
+                    "Backtest load failed";
+
+                backtestStatus.className =
+                    "status-error";
+
+            }
+
+        }
+
+    }
+
+
+    if (backtestReload) {
+
+        backtestReload.addEventListener(
+            "click",
+            loadBacktest
+        );
+
+    }
+
+
+    /*
+     * -----------------------------
+     * Reload chart
+     * -----------------------------
+     */
+
+    const reloadBtn =
+        document.getElementById("reloadBtn");
+
+    if (reloadBtn) {
+
+        reloadBtn.addEventListener("click", () => {
+
+            if (typeof window.redrawChart === "function") {
+                window.redrawChart();
+            }
+
+            loadBacktest();
+
+        });
+
+    }
+
+
+    /*
+     * -----------------------------
+     * Reset chart
+     * -----------------------------
+     */
+
+    const resetChart =
+        document.getElementById("resetChart");
+
+
+    if (resetChart) {
+
+        resetChart.addEventListener("click", () => {
+
+            window.macdMode = "normal";
+            window.rsiMode = "normal";
+            window.atrMode = "normal";
+
+
+            document.querySelectorAll(
+                "[data-indicator]"
+            ).forEach(btn => {
+
+                btn.classList.toggle(
+                    "active",
+                    btn.dataset.mode === "normal"
+                );
+
+            });
+
+
+            /*
+             * meat_chart.js-ийн доторх
+             * local variables шууд харагдахгүй.
+             *
+             * Тиймээс public reset function байвал
+             * ашиглана.
+             */
+
+            if (typeof window.resetChartView === "function") {
+                window.resetChartView();
+            } else {
+                redraw();
+            }
+
+        });
+
+    }
+
+
+    /*
+     * -----------------------------
+     * Initial load
+     * -----------------------------
+     */
+
+    loadBacktest();
+
+});
+
+</script>
+
+</body>
+</html>
