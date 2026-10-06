@@ -273,7 +273,7 @@ document.addEventListener("DOMContentLoaded",()=>{
  async function fetchCandles(){
   try{
    interval="1m";symbol="GOLD";
-   const r=await fetch("/api/gold");
+   const r=await fetch("/candles/gold");
    if(!r.ok)throw new Error(`HTTP ${r.status}`);
    const result=await r.json();
    if(result.error)throw new Error(result.error);
