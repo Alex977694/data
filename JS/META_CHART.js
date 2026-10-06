@@ -161,8 +161,16 @@ document.addEventListener("DOMContentLoaded",()=>{
   /* CANDLES */
   data.forEach((d,i)=>{
    const [,open,high,low,close]=d;
+   
+   // Хэрэв утга нь тоо биш (NaN) байвал зурахгүй алгасах хамгаалалт
+   if(!Number.isFinite(open) || !Number.isFinite(high) || !Number.isFinite(low) || !Number.isFinite(close)) return;
+
    const x=padding+i*candleWidth;
    const yO=priceToY(open),yC=priceToY(close),yH=priceToY(high),yL=priceToY(low);
+   
+   // Координатуудfinite эсэхийг шалгах
+   if(!Number.isFinite(yO) || !Number.isFinite(yC) || !Number.isFinite(yH) || !Number.isFinite(yL)) return;
+
    const bull=close>=open;
 
    const grd=ctx.createLinearGradient(x,yH,x,yL);
@@ -273,7 +281,7 @@ document.addEventListener("DOMContentLoaded",()=>{
  async function fetchCandles(){
   try{
    interval="1m";symbol="GOLD";
-   const r=await fetch("/candles/gold");
+   const r=await fetch("/candles/GOLD");
    if(!r.ok)throw new Error(`HTTP ${r.status}`);
    const result=await r.json();
    if(result.error)throw new Error(result.error);
