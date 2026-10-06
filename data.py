@@ -148,7 +148,6 @@ def get_selected_symbols():
         return {"selected_symbols": list(selected_symbols)}
     
 # ==================== CANDLE & INDICATOR ENDPOINTS ====================
-
 @app.get("/rsi/{symbol}")
 def get_rsi_data(symbol: str):
     symbol = symbol.upper()
@@ -158,20 +157,21 @@ def get_rsi_data(symbol: str):
         klines = kline_history[symbol]
 
     try:
+        # arrays.py файлаас RSI массивыг татаж авна
+        rsi_vals_array = calculate_rsi_array(klines)
+        
+        # rsi.py файлаас бусад утгуудыг дуудна
+        rsi_vals = calculate_rsi_values(klines)
         rsi_crs = calculate_rsi_cross(klines)
         rsi_sts = calculate_rsi_states(klines)
         rsi_lst = calculate_rsi_laststatus(klines)
         rsi_trd = calculate_rsi_trend(klines)
         rsi_avg = calculate_rsi_average(klines)
 
-        # 3. Бүгдийг нэгтгээд буцаах
         return {
             "symbol": symbol,
-            "rsi_array": rsi_vals,
-            "rsi0": rsi_vals[-1] if rsi_vals else None,
-            "rsi1": rsi_vals[-2] if len(rsi_vals) > 2 else None,
-            "rsi2": rsi_vals[-3] if len(rsi_vals) > 3 else None,
-            "rsi3": rsi_vals[-4] if len(rsi_vals) > 4 else None,
+            "rsi_array": rsi_vals_array,
+            **rsi_vals,
             **rsi_crs,
             **rsi_sts,
             **rsi_lst,
@@ -235,6 +235,10 @@ def get_symbol_macd(symbol: str):
         klines = kline_history[symbol]
 
     try:
+        # arrays.py файлаас MACD массивыг татаж авна
+        macd_arrays = calculate_macd_arrays(klines)
+        
+        # macd.py файлаас бусад утгуудыг дуудна
         macd_vals = calculate_macd_values(klines)
         macd_crs = calculate_macd_cross(klines)
         macd_sts = calculate_macd_state(klines)
