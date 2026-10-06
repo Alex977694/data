@@ -239,41 +239,30 @@ def get_symbol_macd(symbol: str):
             raise HTTPException(status_code=404, detail="Symbol not found or not loaded yet")
         klines = kline_history[symbol]
 
-    result = calculate_macd_report(klines, symbol)
-    if "error" in result:
-        raise HTTPException(status_code=400, detail=result["error"])
-    return result
-
-@app.get("/macd2/{symbol}")
-def get_symbol_macd_new(symbol: str):
-    symbol = symbol.upper()
-    with cache_lock:
-        if symbol not in kline_history:
-            raise HTTPException(status_code=404, detail="Symbol not found or not loaded yet")
-        klines = kline_history[symbol]
-
     try:
-        # Бүх шинэ MACD функцүүдийг нэгтгэж дуудах
+        # MACD-ийн жижиг функцүүдийг бүгдийг нь дуудаж нэгтгэх
+        macd_arrays = calculate_macd_arrays(klines)
         macd_vals = calculate_macd_values(klines)
         macd_crs = calculate_macd_cross(klines)
         macd_sts = calculate_macd_state(klines)
         macd_trd = calculate_macd_trend(klines)
         macd_avg = calculate_macd_average(klines)
-        macd_lmt = calculate_macd_limits(klines)
+        macd_lim = calculate_macd_limits(klines)
         macd_init = calculate_macd_initial_crosses(klines)
         macd_pks = calculate_macd_peaks(klines)
 
-        return JSONResponse(content=jsonable_encoder({
+        return {
             "symbol": symbol,
+            **macd_arrays,
             **macd_vals,
             **macd_crs,
             **macd_sts,
             **macd_trd,
             **macd_avg,
-            **macd_lmt,
+            **macd_lim,
             **macd_init,
             **macd_pks
-        }))
+        }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     
