@@ -151,7 +151,7 @@ def get_selected_symbols():
 # ==================== CANDLE & INDICATOR ENDPOINTS ====================
 
 @app.get("/rsi/{symbol}")
-def get_symbol_rsi(symbol: str):
+def get_rsi_data(symbol: str):
     symbol = symbol.upper()
     with cache_lock:
         if symbol not in kline_history:
@@ -159,22 +159,30 @@ def get_symbol_rsi(symbol: str):
         klines = kline_history[symbol]
 
     try:
-        rsi_vals = calculate_rsi_values(klines)
+        # 1. Arrays файлын массив тооцоологч
+        rsi_vals = calculate_rsi_array(klines)
+        
+        # 2. Бусад тусдаа функцүүдээс өгөгдлүүдийг нь дуудах
         rsi_crs = calculate_rsi_cross(klines)
         rsi_sts = calculate_rsi_states(klines)
         rsi_lst = calculate_rsi_laststatus(klines)
         rsi_trd = calculate_rsi_trend(klines)
         rsi_avg = calculate_rsi_average(klines)
 
-        return JSONResponse(content=jsonable_encoder({
+        # 3. Бүгдийг нэгтгээд буцаах
+        return {
             "symbol": symbol,
-            **rsi_vals,
+            "rsi_array": rsi_vals,
+            "rsi0": rsi_vals[-1] if rsi_vals else None,
+            "rsi1": rsi_vals[-2] if len(rsi_vals) > 2 else None,
+            "rsi2": rsi_vals[-3] if len(rsi_vals) > 3 else None,
+            "rsi3": rsi_vals[-4] if len(rsi_vals) > 4 else None,
             **rsi_crs,
             **rsi_sts,
             **rsi_lst,
             **rsi_trd,
             **rsi_avg
-        }))
+        }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
