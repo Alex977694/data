@@ -773,10 +773,10 @@ market_quotes = {}
 @app.post("/update-gold")
 def receive_gold_candles(data: dict):
     """
-    Локал дээр ажиллаж буй MT5 bridge скриптээс Gold (XAUUSD)-ийн 
+    Локал дээр ажиллаж буй MT5 bridge скриптээс Gold (GOLD)-ийн 
     10,000 хүртэлх лааны дата болон Ask/Bid үнийг хүлээж авч RAM cache руу хийх Endpoint.
     """
-    symbol = data.get("symbol", "XAUUSD").upper()
+    symbol = data.get("symbol", "GOLD").upper()
     candles = data.get("candles", [])
     ask_price = data.get("ask", 0.0)
     bid_price = data.get("bid", 0.0)
