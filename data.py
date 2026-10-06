@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import websocket
 from binance.um_futures import UMFutures
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 import uvicorn
 import requests
@@ -61,6 +62,11 @@ selected_lock = threading.Lock()
 
 # ==================== FASTAPI APP ====================
 app = FastAPI(title="Binance Controlled Candle Data Daemon")
+
+from fastapi.staticfiles import StaticFiles
+
+# Сервер дээр JS хавтсаа холбох
+app.mount("/JS", StaticFiles(directory="JS"), name="JS")
 
 @app.get("/")
 def root():
