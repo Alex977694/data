@@ -321,39 +321,43 @@ async function fetchCandles(){
 function startLivePolling(symbol) {
     setInterval(async () => {
         try {
-            const [cRes, rRes, aRes] = await Promise.all([
-                fetch(`/candles/${symbol}`),
-                fetch(`/rsi/${symbol}`),
-                fetch(`/arrays/${symbol}`)
-            ]);
-
+            // Зөвхөн лааны датагаа л хөнгөн татаж авна (RSI, MACD массив бүрийг секунд тутам бүтнээр нь татах шаардлагагүй)
+            const cRes = await fetch(`/candles/${symbol}`);
             if(cRes.ok) {
                 const cData = await cRes.json();
                 const candles = cData.candles || [];
                 if(candles.length > 0) {
-                    window.allData = candles.map(d => [
-                        Number(d[0]), Number(d[1]), Number(d[2]), Number(d[3]), Number(d[4]), Number(d[5])
-                    ]);
+                    const latestCandle = candles[candles.length - 1];
+                    const lastIdx = window.allData.length - 1;
+                    
+                    // Хэрэв сүүлийн лааны цаг таарч байвал зөвхөн OHLCV утгыг нь шинэчилнэ (бүтэн массивыг дахин шинээр үүсгэхгүй)
+                    if(lastIdx >= 0 && window.allData[lastIdx][0] === Number(latestCandle[0])) {
+                        window.allData[lastIdx] = [
+                            Number(latestCandle[0]),
+                            Number(latestCandle[1]),
+                            Number(latestCandle[2]),
+                            Number(latestCandle[3]),
+                            Number(latestCandle[4]),
+                            Number(latestCandle[5])
+                        ];
+                    } else {
+                        // Цоо шинэ минут эхэлсэн байвал массив руу түлхэж оруулна
+                        window.allData.push([
+                            Number(latestCandle[0]),
+                            Number(latestCandle[1]),
+                            Number(latestCandle[2]),
+                            Number(latestCandle[3]),
+                            Number(latestCandle[4]),
+                            Number(latestCandle[5])
+                        ]);
+                    }
+                    draw();
                 }
             }
-
-            if(rRes.ok) {
-                const rJson = await rRes.json();
-                window.rsiArrayData = rJson.rsi_array || [];
-            }
-
-            if(aRes.ok) {
-                const aJson = await aRes.json();
-                window.macdArrayData = aJson.macd_line_array || [];
-                window.signalArrayData = aJson.macd_signal_array || [];
-                window.histArrayData = aJson.macd_histogram_array || [];
-            }
-
-            draw();
         } catch(e) {
             console.error("[LIVE POLLING ERROR]", e);
         }
-    }, 1500);
+    }, 1000); // 1 секунд тутамд зөвхөн сүүлийн лаагаа шалгана
 }
 
 // Server-ээс шинэ датаг секунд тутамд татаж график руу шинэчлэх
