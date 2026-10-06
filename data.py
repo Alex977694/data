@@ -25,7 +25,7 @@ from rsi import (
     calculate_rsi_trend,
     calculate_rsi_average
 )
-from mac import (
+from macd import (
     calculate_macd_values,
     calculate_macd_cross,
     calculate_macd_state,
