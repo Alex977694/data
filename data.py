@@ -406,9 +406,6 @@ def get_binchart2():
             return f.read()
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="binchart2.html файл олдсонгүй!")
-@app.route('/JS/')
-def serve_js(filename):
-    return send_from_directory(JS_DIR, filename)
 
 @app.get("/price/{symbol}")
 def get_symbol_live_price(symbol: str):
