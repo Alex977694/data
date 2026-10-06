@@ -1,1 +1,124 @@
+HTML=r"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="/JS/style.css">
+<title>GOLD 1M Hedge Strategy Builder</title>
+</head>
+<body>
 
+<h1>GOLD 1M Hedge Strategy Builder</h1>
+<div id="status" class="status">Loading GOLD data...</div>
+
+<!-- STRATEGY SAVE / LOAD -->
+<div class="section">
+<div class="section-title">STRATEGY SAVE / LOAD</div>
+<div class="strategy-tools">
+<button id="copyStrategy">COPY JSON</button>
+<button id="pasteStrategy">PASTE JSON</button>
+<button id="exportStrategy" class="run">EXPORT JSON</button>
+<button id="importStrategy">IMPORT JSON</button>
+<button id="clearStrategy">CLEAR</button>
+<input id="strategyFile" type="file" accept=".json,application/json" style="display:none">
+</div>
+<textarea id="strategyJson" class="strategy-json" spellcheck="false" placeholder="Strategy JSON энд харагдана. JSON paste хийгээд IMPORT JSON дарж болно."></textarea>
+</div>
+
+<div id="groups"></div>
+
+<div class="section">
+<div class="section-title">INDICATOR SETTINGS</div>
+<div class="row">
+<label>RSI PERIOD</label><input id="rsiPeriod" type="number" min="2" step="1" value="7">
+<label>RSI SOURCE</label>
+<select id="rsiSource"><option value="open">OPEN</option><option value="high">HIGH</option><option value="low">LOW</option><option value="close" selected>CLOSE</option></select>
+</div>
+<div class="row">
+<label>MACD FAST</label><input id="macdFast" type="number" min="1" step="1" value="12">
+<label>MACD SLOW</label><input id="macdSlow" type="number" min="2" step="1" value="26">
+<label>MACD SIGNAL</label><input id="macdSignal" type="number" min="1" step="1" value="9">
+</div>
+<div class="row">
+<label>ATR PERIOD</label><input id="atrPeriod" type="number" min="1" step="1" value="14">
+</div>
+<button id="applyIndicators" class="run">APPLY INDICATORS</button>
+<div id="indicatorStatus" class="preview">RSI 7 / CLOSE | MACD 12,26,9</div>
+</div>
+
+<div class="section">
+<div class="section-title">ACCOUNT SETTINGS</div>
+<div class="row">
+<label>BALANCE $</label><input id="accBalance" type="number" min="1" step="any" value="1000">
+<label>LEVERAGE 1:</label><input id="accLeverage" type="number" min="1" step="1" value="100">
+<label>LOT</label><input id="accLot" type="number" min="0.01" step="0.01" value="0.01">
+</div>
+<div class="row">
+<label>CONTRACT SIZE</label><input id="accContract" type="number" min="1" step="any" value="100">
+<label>STOP-OUT %</label><input id="accStopOut" type="number" min="1" step="1" value="50">
+<label class="range-toggle"><input id="accHedged" type="checkbox"> HEDGED MARGIN</label>
+</div>
+<div class="preview">HEDGED MARGIN унтраалттай бол LONG ба SHORT бүрийн margin нийлбэрээр бодогдоно (консерватив).</div>
+</div>
+
+<div class="section">
+<div class="section-title">BACKTEST DATA</div>
+<div class="row">
+<label>CANDLE LIMIT</label><input id="candleLimit" type="number" min="100" step="100" value="10080">
+<button id="refreshData" class="run">REFRESH DATA</button>
+<button id="oldData">OLD DATA</button>
+</div>
+<div id="refreshStatus" class="preview">Ready. Choose OLD DATA or REFRESH DATA.</div>
+</div>
+
+<div class="section">
+<div class="section-title">BACKTEST</div>
+<div class="row">
+<button id="run" class="run" disabled>RUN HEDGE BACKTEST</button>
+<label class="range-toggle"><input id="addRange" type="checkbox"> ADD RANGE</label>
+<select id="rangeMode" class="range-select" style="display:none;"><option value="last">LAST N DAYS</option><option value="block">DAY N</option></select>
+<select id="rangeDay" class="range-day" style="display:none;"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option></select>
+<span id="rangePreview" class="range-preview" style="display:none;">-</span>
+</div>
+<div id="backtestStatus" class="preview">Backtest is waiting for refreshed data.</div>
+</div>
+
+<div class="section">
+<div class="section-title">TRADE RESULTS</div>
+<div class="results" id="results"></div>
+<div id="tradeLog" class="log"></div>
+</div>
+
+<div class="section">
+<div class="section-title">BACKTEST STATISTICS</div>
+<div class="stats" id="stats"></div>
+</div>
+
+<div class="section">
+<div class="section-title">ACCOUNT STATISTICS</div>
+<div class="stats" id="accStats"></div>
+<div id="accNote" class="preview"></div>
+</div>
+
+<div class="section">
+<div class="section-title">OPENED TRADE DETAILS</div>
+<div id="openedLog" class="log"></div>
+</div>
+
+<div class="section">
+<div class="section-title">COMPLETED TRADE DETAILS</div>
+<div id="completedLog" class="log"></div>
+</div>
+
+<div class="section" id="chartSection">
+<div class="section-title">META CHART</div>
+<div id="metaChartContainer" style="width:100%;height:750px;background:#111827;border-radius:8px;overflow:hidden;"></div>
+</div>
+
+<div class="section">
+<div class="section-title">DATA</div>
+<div id="dataInfo" class="data-info">-</div>
+</div>
+
+<script src="/JS/META_CHART.js?v=5"></script>
+<script>
