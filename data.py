@@ -15,7 +15,6 @@ from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from ohlc_data import calculate_ohlc_tracker_report
 from ema_data import calculate_ema_report
-from macd_data import calculate_macd_report, _build_initial_macd_state, macd_state
 from data_topmovers import calculate_top_movers_report
 from data_newmovers import calculate_new_movers_report
 from rsi import (
