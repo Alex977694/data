@@ -283,11 +283,10 @@ async function fetchCandles(){
     interval = "1m"; 
     symbol = "GOLD";
     
-    // 1. Бүх датаг зэрэг татаж авах (Candles, RSI, MACD Arrays)
     const [candlesRes, rsiRes, arraysRes] = await Promise.all([
         fetch("/candles/GOLD"),
         fetch("/rsi/GOLD"),
-        fetch("/arrays/GOLD") // <-- /macd/GOLD биш /arrays/GOLD рүү хандана
+        fetch("/arrays/GOLD")
     ]);
 
     if(!candlesRes.ok) throw new Error(`HTTP ${candlesRes.status}`);
@@ -295,7 +294,6 @@ async function fetchCandles(){
     const candleData = await candlesRes.json();
     const candles = candleData.candles || [];
     
-    // OHLCV датаг оноох
     window.allData = candles.map(d => {
         const time = d[0];
         const open = d[1];
@@ -306,13 +304,11 @@ async function fetchCandles(){
         return [Number(time), Number(open), Number(high), Number(low), Number(close), Number(volume)];
     });
 
-    // 2. RSI массив оноох
     if(rsiRes.ok) {
         const rsiJson = await rsiRes.json();
         window.rsiArrayData = rsiJson.rsi_array || []; 
     }
 
-    // 3. MACD массивуудыг /arrays/GOLD endpoint-оос оноох
     if(arraysRes.ok) {
         const arraysJson = await arraysRes.json();
         window.macdArrayData = arraysJson.macd_line_array || [];
@@ -322,6 +318,10 @@ async function fetchCandles(){
 
     draw();
     dispatchChartUpdate();
+
+    // ЭНД Live WebSocket-г зааж өгч ажиллуулна!
+    initLiveWebSocket(symbol);
+
  }catch(e){console.error("[META CHART / FLASK DATA ERROR]",e)}
 }
 
