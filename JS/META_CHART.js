@@ -283,30 +283,45 @@ async function fetchCandles(){
     interval = "1m"; 
     symbol = "GOLD";
     
-    const r = await fetch("/candles/GOLD"); 
-    
-    if(!r.ok) throw new Error(`HTTP ${r.status}`);
-    const result = await r.json();
-    if(result.error) throw new Error(result.error);
+    // 1. Бүх датаг зэрэг татаж авах (Candles, RSI, MACD)
+    const [candlesRes, rsiRes, macdRes] = await Promise.all([
+        fetch("/candles/GOLD"),
+        fetch("/rsi/GOLD"),
+        fetch("/macd/GOLD")
+    ]);
 
-    const candles = result.candles || [];
+    if(!candlesRes.ok) throw new Error(`HTTP ${candlesRes.status}`);
+    
+    const candleData = await candlesRes.json();
+    const candles = candleData.candles || [];
+    
+    // OHLCV датаг оноох
     window.allData = candles.map(d => {
-        const time = d.open_time || d[0];
-        const open = d.open || d[1];
-        const high = d.high || d[2];
-        const low = d.low || d[3];
-        const close = d.close || d[4];
-        const volume = d.volume || d[5];
+        const time = d[0];
+        const open = d[1];
+        const high = d[2];
+        const low = d[3];
+        const close = d[4];
+        const volume = d[5];
         return [Number(time), Number(open), Number(high), Number(low), Number(close), Number(volume)];
     });
 
-    // Индикаторуудыг энд онооно (candles тодорхой болсон хойно)
-    window.rsiArrayData = candles.map(d => finNum(d.rsi !== undefined ? d.rsi : d[6]));
-    window.macdArrayData = candles.map(d => finNum(d.macd_line !== undefined ? d.macd_line : d[7]));
-    window.signalArrayData = candles.map(d => finNum(d.macd_signal !== undefined ? d.macd_signal : d[8]));
-    window.histArrayData = candles.map(d => finNum(d.macd_histogram !== undefined ? d.macd_histogram : d[9]));
-    window.atrArrayData = candles.map(d => finNum(d.atr !== undefined ? d.atr : d[10]));
-    
+    // 2. RSI датаг оноох (/rsi/GOLD endpoint-оос ирж буй массивыг ашиглах)
+    if(rsiRes.ok) {
+        const rsiJson = await rsiRes.json();
+        // Хэрэв /rsi/GOLD нь macd шиг массив буцаадаг бол энд холбоно
+        // Жишээ нь rsiJson.rsi_array байвал эсвэл шууд массив байвал:
+        window.rsiArrayData = rsiJson.rsi_array || []; 
+    }
+
+    // 3. MACD датаг оноох (/macd/GOLD endpoint-оос ирж буй массивыг ашиглах)
+    if(macdRes.ok) {
+        const macdJson = await macdRes.json();
+        window.macdArrayData = macdJson.macd_array || [];
+        window.signalArrayData = macdJson.signal_array || [];
+        window.histArrayData = macdJson.histogram_array || [];
+    }
+
     draw();
     dispatchChartUpdate();
  }catch(e){console.error("[META CHART / FLASK DATA ERROR]",e)}
