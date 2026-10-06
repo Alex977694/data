@@ -158,10 +158,6 @@ def get_rsi_data(symbol: str):
         klines = kline_history[symbol]
 
     try:
-        # 1. Arrays файлын массив тооцоологч
-        rsi_vals = calculate_rsi_array(klines)
-        
-        # 2. Бусад тусдаа функцүүдээс өгөгдлүүдийг нь дуудах
         rsi_crs = calculate_rsi_cross(klines)
         rsi_sts = calculate_rsi_states(klines)
         rsi_lst = calculate_rsi_laststatus(klines)
@@ -239,8 +235,6 @@ def get_symbol_macd(symbol: str):
         klines = kline_history[symbol]
 
     try:
-        # MACD-ийн жижиг функцүүдийг бүгдийг нь дуудаж нэгтгэх
-        macd_arrays = calculate_macd_arrays(klines)
         macd_vals = calculate_macd_values(klines)
         macd_crs = calculate_macd_cross(klines)
         macd_sts = calculate_macd_state(klines)
