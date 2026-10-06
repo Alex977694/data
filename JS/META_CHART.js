@@ -63,11 +63,11 @@ document.addEventListener("DOMContentLoaded",()=>{
  let symbol="GOLD",interval="1m";
 
  window.allData=[];
- window.rsiArrayData=[];
- window.macdArrayData=[];
- window.signalArrayData=[];
- window.histArrayData=[];
- window.atrArrayData=[];
+ window.rsiArrayData = candles.map(d => finNum(d.rsi !== undefined ? d.rsi : d[6]));
+ window.macdArrayData = candles.map(d => finNum(d.macd_line !== undefined ? d.macd_line : d[7]));
+ window.signalArrayData = candles.map(d => finNum(d.macd_signal !== undefined ? d.macd_signal : d[8]));
+ window.histArrayData = candles.map(d => finNum(d.macd_histogram !== undefined ? d.macd_histogram : d[9]));
+ window.atrArrayData = candles.map(d => finNum(d.atr !== undefined ? d.atr : d[10]));
  window.backtestEvents=[];
 
  let visibleCount=500,offset=0;
