@@ -326,36 +326,33 @@ async function fetchCandles(){
 }
 
 // Binance WebSocket-оор Live үнэ болон лааг шинэчлэх
-function initLiveWebSocket(symbol) {
-    const wsSymbol = symbol.toLowerCase();
-    const ws = new WebSocket(`wss://fstream.binance.com/ws/${wsSymbol}@kline_1m`);
-
-    ws.onmessage = function(event) {
-        const data = JSON.parse(event.data);
-        if(data.k) {
-            const k = data.k;
-            const t = Number(k.t); // Start time
-            const o = Number(k.o);
-            const h = Number(k.h);
-            const l = Number(k.l);
-            const c = Number(k.c);
-            const v = Number(k.v);
-
-            if(window.allData && window.allData.length > 0) {
-                const lastIdx = window.allData.length - 1;
-                // Хэрэв цаг нь таарч байвал сүүлийн лааг live-аар шинэчлэнэ
-                if(window.allData[lastIdx][0] === t) {
-                    window.allData[lastIdx] = [t, o, h, l, c, v];
-                } else {
-                    // Шинэ лаа үүссэн байвал массив руу нэмнэ
-                    window.allData.push([t, o, h, l, c, v]);
+// Серверээсээ 2 секунд тутамд сүүлийн лааны датаг татаж live болгох
+function startLivePolling(symbol) {
+    setInterval(async () => {
+        try {
+            const res = await fetch(`/candles/${symbol}`);
+            if(res.ok) {
+                const data = await res.json();
+                const candles = data.candles || [];
+                if(candles.length > 0) {
+                    // Сүүлийн лааг шинэчлэх
+                    const latest = candles[candles.length - 1];
+                    const lastIdx = window.allData.length - 1;
+                    
+                    if(window.allData[lastIdx][0] === latest[0]) {
+                        window.allData[lastIdx] = latest.map(Number);
+                    } else {
+                        window.allData.push(latest.map(Number));
+                    }
+                    draw();
                 }
-                // Графикийг шууд автоматаар зурах
-                draw();
             }
+        } catch(e) {
+            console.error("[LIVE POLLING ERROR]", e);
         }
-    };
+    }, 2000); // 2 секунд тутамд сервер рүү хүсэлт явуулж шинэчилнэ
 }
+ 
  async function fetchBacktest(){
   try{
    const r=await fetch("/api/backtest");
