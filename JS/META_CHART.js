@@ -63,11 +63,11 @@ document.addEventListener("DOMContentLoaded",()=>{
  let symbol="GOLD",interval="1m";
 
  window.allData=[];
- window.rsiArrayData = candles.map(d => finNum(d.rsi !== undefined ? d.rsi : d[6]));
- window.macdArrayData = candles.map(d => finNum(d.macd_line !== undefined ? d.macd_line : d[7]));
- window.signalArrayData = candles.map(d => finNum(d.macd_signal !== undefined ? d.macd_signal : d[8]));
- window.histArrayData = candles.map(d => finNum(d.macd_histogram !== undefined ? d.macd_histogram : d[9]));
- window.atrArrayData = candles.map(d => finNum(d.atr !== undefined ? d.atr : d[10]));
+ window.rsiArrayData = [];
+ window.macdArrayData = [];
+ window.signalArrayData = [];
+ window.histArrayData = [];
+ window.atrArrayData = [];
  window.backtestEvents=[];
 
  let visibleCount=500,offset=0;
@@ -283,7 +283,6 @@ async function fetchCandles(){
     interval = "1m"; 
     symbol = "GOLD";
     
-    // Энэ хаяг сервер дээр байгаа эсэхийг сайтар шалгах (Том жижиг үсэг анхаарах)
     const r = await fetch("/candles/GOLD"); 
     
     if(!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -301,10 +300,12 @@ async function fetchCandles(){
         return [Number(time), Number(open), Number(high), Number(low), Number(close), Number(volume)];
     });
 
-    window.rsiArrayData = candles.map(d => finNum(d.rsi));
-    window.macdArrayData = candles.map(d => finNum(d.macd_line));
-    window.signalArrayData = candles.map(d => finNum(d.macd_signal));
-    window.histArrayData = candles.map(d => finNum(d.macd_histogram));
+    // Индикаторуудыг энд онооно (candles тодорхой болсон хойно)
+    window.rsiArrayData = candles.map(d => finNum(d.rsi !== undefined ? d.rsi : d[6]));
+    window.macdArrayData = candles.map(d => finNum(d.macd_line !== undefined ? d.macd_line : d[7]));
+    window.signalArrayData = candles.map(d => finNum(d.macd_signal !== undefined ? d.macd_signal : d[8]));
+    window.histArrayData = candles.map(d => finNum(d.macd_histogram !== undefined ? d.macd_histogram : d[9]));
+    window.atrArrayData = candles.map(d => finNum(d.atr !== undefined ? d.atr : d[10]));
     
     draw();
     dispatchChartUpdate();
