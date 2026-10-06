@@ -295,13 +295,7 @@ async function fetchCandles(){
     const candles = candleData.candles || [];
     
     window.allData = candles.map(d => {
-        const time = d[0];
-        const open = d[1];
-        const high = d[2];
-        const low = d[3];
-        const close = d[4];
-        const volume = d[5];
-        return [Number(time), Number(open), Number(high), Number(low), Number(close), Number(volume)];
+        return [Number(d[0]), Number(d[1]), Number(d[2]), Number(d[3]), Number(d[4]), Number(d[5])];
     });
 
     if(rsiRes.ok) {
@@ -310,19 +304,56 @@ async function fetchCandles(){
     }
 
     if(arraysRes.ok) {
-        const arraysJson = await arraysJson.json();
-        window.macdArrayData = arraysJson.macd_line_array || [];
-        window.signalArrayData = arraysJson.macd_signal_array || [];
-        window.histArrayData = arraysJson.macd_histogram_array || [];
+        const jsonArrays = await arraysRes.json();
+        window.macdArrayData = jsonArrays.macd_line_array || [];
+        window.signalArrayData = jsonArrays.macd_signal_array || [];
+        window.histArrayData = jsonArrays.macd_histogram_array || [];
     }
 
     draw();
     dispatchChartUpdate();
 
-    // ЭНД Live Polling-г ажиллуулна (Python script-ээс ирж буй шинэ үнийг автоматаар татна)
     startLivePolling(symbol);
 
  }catch(e){console.error("[META CHART / FLASK DATA ERROR]",e)}
+}
+
+function startLivePolling(symbol) {
+    setInterval(async () => {
+        try {
+            const [cRes, rRes, aRes] = await Promise.all([
+                fetch(`/candles/${symbol}`),
+                fetch(`/rsi/${symbol}`),
+                fetch(`/arrays/${symbol}`)
+            ]);
+
+            if(cRes.ok) {
+                const cData = await cRes.json();
+                const candles = cData.candles || [];
+                if(candles.length > 0) {
+                    window.allData = candles.map(d => [
+                        Number(d[0]), Number(d[1]), Number(d[2]), Number(d[3]), Number(d[4]), Number(d[5])
+                    ]);
+                }
+            }
+
+            if(rRes.ok) {
+                const rJson = await rRes.json();
+                window.rsiArrayData = rJson.rsi_array || [];
+            }
+
+            if(aRes.ok) {
+                const aJson = await aRes.json();
+                window.macdArrayData = aJson.macd_line_array || [];
+                window.signalArrayData = aJson.macd_signal_array || [];
+                window.histArrayData = aJson.macd_histogram_array || [];
+            }
+
+            draw();
+        } catch(e) {
+            console.error("[LIVE POLLING ERROR]", e);
+        }
+    }, 1500);
 }
 
 // Server-ээс шинэ датаг секунд тутамд татаж график руу шинэчлэх
