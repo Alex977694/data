@@ -153,25 +153,39 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi import FastAPI, HTTPException, Query
 import traceback
 
+from fastapi import FastAPI, HTTPException, Query
+import pandas as pd
+from ta.momentum import RSIIndicator
+import traceback
+
 @app.get("/rsi/{symbol}")
 def get_rsi_endpoint(
     symbol: str, 
-    period: int = Query(7, description="RSI period"), 
-    source: str = Query("close", description="Price source")
+    period: int = 7, 
+    source: str = "close"
 ):
     try:
         symbol = symbol.upper()
+        
+        # Хэрэв kline өгөгдөл байхгүй бол 500 алдаа биш хоосон массив буцааж серверээ хамгаална
         if symbol not in kline_history or not kline_history[symbol]:
-            raise HTTPException(status_code=404, detail=f"Symbol {symbol} not found or klines empty")
+            return {"rsi_array": []}
         
         klines = kline_history[symbol]
         
-        # Source сонгох логик
-        source_index = {"open": 1, "high": 2, "low": 3, "close": 4}.get(source.lower(), 4)
-        closes = [float(kline[source_index]) for kline in klines]
+        # Source-ийн индексийг зөв тодорхойлох
+        source_map = {"open": 1, "high": 2, "low": 3, "close": 4}
+        source_index = source_map.get(str(source).lower(), 4)
         
-        if len(closes) < period:
-            return {"rsi_array": []} # Өгөгдлийн урт хүрэхгүй бол хоосон массив буцаана
+        closes = []
+        for kline in klines:
+            try:
+                closes.append(float(kline[source_index]))
+            except (IndexError, ValueError):
+                continue
+                
+        if len(closes) < int(period):
+            return {"rsi_array": []}
             
         rsi_series = RSIIndicator(close=pd.Series(closes), window=int(period)).rsi().dropna()
         
@@ -179,10 +193,10 @@ def get_rsi_endpoint(
             "rsi_array": [float(v) for v in rsi_series.tolist()]
         }
     except Exception as e:
-        # Сервер дээр яг ямар алдаа гарсныг console дээр тод харуулна
         print(f"--- RSI ERROR FOR {symbol}: {str(e)} ---")
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        # Алдаа гарсан ч сервер унахгүйгээр хоосон массив буцаана
+        return {"rsi_array": []}
         
 # ==================== ARRAYS (MACD) ENDPOINT ====================
 @app.get("/arrays/{symbol}")
