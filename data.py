@@ -147,9 +147,12 @@ def get_selected_symbols():
     with selected_lock:
         return {"selected_symbols": list(selected_symbols)}
     
-# ==================== CANDLE & INDICATOR ENDPOINTS ====================
 @app.get("/rsi/{symbol}")
-def get_rsi_data(symbol: str):
+def get_rsi_data(
+    symbol: str, 
+    period: int = 14, 
+    source: str = "close"
+):
     symbol = symbol.upper()
     with cache_lock:
         if symbol not in kline_history:
@@ -157,16 +160,14 @@ def get_rsi_data(symbol: str):
         klines = kline_history[symbol]
 
     try:
-        # arrays.py файлаас RSI массивыг татаж авна
-        rsi_vals_array = calculate_rsi_array(klines)
-        
-        # rsi.py файлаас бусад утгуудыг дуудна
-        rsi_vals = calculate_rsi_values(klines)
-        rsi_crs = calculate_rsi_cross(klines)
-        rsi_sts = calculate_rsi_states(klines)
-        rsi_lst = calculate_rsi_laststatus(klines)
-        rsi_trd = calculate_rsi_trend(klines)
-        rsi_avg = calculate_rsi_average(klines)
+        # RSI функцүүддээ period болон source параметрүүдийг дамжуулна
+        rsi_vals_array = calculate_rsi_array(klines, period=period, source=source)
+        rsi_vals = calculate_rsi_values(klines, period=period, source=source)
+        rsi_crs = calculate_rsi_cross(klines, period=period, source=source)
+        rsi_sts = calculate_rsi_states(klines, period=period, source=source)
+        rsi_lst = calculate_rsi_laststatus(klines, period=period, source=source)
+        rsi_trd = calculate_rsi_trend(klines, period=period, source=source)
+        rsi_avg = calculate_rsi_average(klines, period=period, source=source)
 
         return {
             "symbol": symbol,
@@ -182,7 +183,14 @@ def get_rsi_data(symbol: str):
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/arrays/{symbol}")
-def get_symbol_arrays(symbol: str):
+def get_symbol_arrays(
+    symbol: str, 
+    rsiPeriod: int = 14, 
+    rsiSource: str = "close",
+    macdFast: int = 12, 
+    macdSlow: int = 26, 
+    macdSignal: int = 9
+):
     symbol = symbol.upper()
     with cache_lock:
         if symbol not in kline_history:
@@ -190,8 +198,8 @@ def get_symbol_arrays(symbol: str):
         klines = kline_history[symbol]
 
     try:
-        rsi_array = calculate_rsi_array(klines)
-        macd_arrays = calculate_macd_arrays(klines)
+        rsi_array = calculate_rsi_array(klines, period=rsiPeriod, source=rsiSource)
+        macd_arrays = calculate_macd_arrays(klines, fast=macdFast, slow=macdSlow, signal=macdSignal)
         return JSONResponse(content=jsonable_encoder({
             "symbol": symbol,
             "rsi_array": rsi_array,
