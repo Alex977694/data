@@ -92,8 +92,7 @@ document.addEventListener("DOMContentLoaded",()=>{
     // Контейнерийн өмнө эсвэл дотор байрлуулах
     container.parentNode.insertBefore(controlPanel, container);
 
-    // Жишээ нь Apply товчийг дархад шинэ утгуудыг авч ажиллах хэсэг:
-    document.getElementById('chartApplyBtn').addEventListener('click', () => {
+    document.getElementById('chartApplyBtn').addEventListener('click', async () => {
         const rsiPeriod = document.getElementById('chartRsiPeriod').value;
         const rsiSource = document.getElementById('chartRsiSource').value;
         const macdFast = document.getElementById('chartMacdFast').value;
@@ -102,8 +101,31 @@ document.addEventListener("DOMContentLoaded",()=>{
     
         console.log("Applying new settings:", { rsiPeriod, rsiSource, macdFast, macdSlow, macdSignal });
     
-        // Эндээс сервер рүү параметрүүдийг явуулж шинэчлэх хүсэлт явуулна.
-        // Жишээ нь: fetchCandlesWithParams({ rsiPeriod, rsiSource, macdFast, macdSlow, macdSignal });
+        try {
+            // Сервер рүү параметрүүдтэйгээ хамт хүсэлт явуулах (FastAPI талд эдгээр query parameter-ийг хүлээж авдаг байх шаардлагатай)
+            const [rsiRes, arraysRes] = await Promise.all([
+                fetch(`/rsi/GOLD?period=${rsiPeriod}&source=${rsiSource}`),
+                fetch(`/arrays/GOLD?fast=${macdFast}&slow=${macdSlow}&signal=${macdSignal}`)
+            ]);
+    
+            if (rsiRes.ok) {
+                const rsiJson = await rsiRes.json();
+                window.rsiArrayData = rsiJson.rsi_array || [];
+            }
+    
+            if (arraysRes.ok) {
+                const jsonArrays = await arraysRes.json();
+                window.macdArrayData = jsonArrays.macd_line_array || [];
+                window.signalArrayData = jsonArrays.macd_signal_array || [];
+                window.histArrayData = jsonArrays.macd_histogram_array || [];
+            }
+    
+            // Шинэ датагаар графикаа шууд дахин зурах
+            draw();
+            console.log("Chart indicators updated successfully!");
+        } catch (e) {
+            console.error("[INDICATOR UPDATE ERROR]", e);
+        }
     });
 
  let symbol="GOLD",interval="1m";
