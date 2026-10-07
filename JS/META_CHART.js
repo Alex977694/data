@@ -92,18 +92,18 @@ document.addEventListener("DOMContentLoaded",()=>{
     // Контейнерийн өмнө эсвэл дотор байрлуулах
     container.parentNode.insertBefore(controlPanel, container);
 
-    // Жишээ нь Apply товчийг дархад input-үүдээс утгыг нь авч сервер рүү хүсэлт явуулдаг байх ёстой:
-    document.getElementById('applyIndicators').addEventListener('click', () => {
-        const rsiPeriod = document.getElementById('rsiPeriod').value;
-        const rsiSource = document.getElementById('rsiSource').value;
-        const macdFast = document.getElementById('macdFast').value;
-        const macdSlow = document.getElementById('macdSlow').value;
-        const macdSignal = document.getElementById('macdSignal').value;
+    // Жишээ нь Apply товчийг дархад шинэ утгуудыг авч ажиллах хэсэг:
+    document.getElementById('chartApplyBtn').addEventListener('click', () => {
+        const rsiPeriod = document.getElementById('chartRsiPeriod').value;
+        const rsiSource = document.getElementById('chartRsiSource').value;
+        const macdFast = document.getElementById('chartMacdFast').value;
+        const macdSlow = document.getElementById('chartMacdSlow').value;
+        const macdSignal = document.getElementById('chartMacdSignal').value;
     
         console.log("Applying new settings:", { rsiPeriod, rsiSource, macdFast, macdSlow, macdSignal });
     
-        // Эндээс сервер рүү шинэ утгатай хүсэлт явуулах эсвэл график дахин зурдаг функц дуудагдах ёстой
-        // Жишээ нь: fetchChartDataWithParams({ rsiPeriod, rsiSource, macdFast, macdSlow, macdSignal });
+        // Эндээс сервер рүү параметрүүдийг явуулж шинэчлэх хүсэлт явуулна.
+        // Жишээ нь: fetchCandlesWithParams({ rsiPeriod, rsiSource, macdFast, macdSlow, macdSignal });
     });
 
  let symbol="GOLD",interval="1m";
