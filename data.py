@@ -147,63 +147,57 @@ def get_selected_symbols():
     with selected_lock:
         return {"selected_symbols": list(selected_symbols)}
     
+from fastapi import FastAPI, HTTPException, Query
+
+# ==================== RSI ENDPOINT ====================
 @app.get("/rsi/{symbol}")
-def get_rsi_data(symbol: str, period: int = 14):
+def get_rsi_endpoint(symbol: str, period: int = Query(7), source: str = Query("close")):
     symbol = symbol.upper()
-    with cache_lock:
-        if symbol not in kline_history:
-            print(f"DEBUG: Symbol {symbol} not in kline_history! Available: {list(kline_history.keys())}")
-            raise HTTPException(status_code=404, detail="Symbol not found or not loaded yet")
-        klines = kline_history[symbol]
-        print(f"DEBUG: Found {len(klines)} klines for {symbol}")
-    try:
-        # RSI функцүүддээ period болон source параметрүүдийг дамжуулна
-        rsi_vals_array = calculate_rsi_array(klines, period=period, source=source)
-        rsi_vals = calculate_rsi_values(klines, period=period, source=source)
-        rsi_crs = calculate_rsi_cross(klines, period=period, source=source)
-        rsi_sts = calculate_rsi_states(klines, period=period, source=source)
-        rsi_lst = calculate_rsi_laststatus(klines, period=period, source=source)
-        rsi_trd = calculate_rsi_trend(klines, period=period, source=source)
-        rsi_avg = calculate_rsi_average(klines, period=period, source=source)
+    if symbol not in kline_history or not kline_history[symbol]:
+        raise HTTPException(status_code=400, detail="Kline data is empty or symbol not found")
+    
+    klines = kline_history[symbol]
+    
+    # Source сонгох логик (Open, High, Low, Close)
+    source_index = {"open": 1, "high": 2, "low": 3, "close": 4}.get(source.lower(), 4)
+    closes = [float(kline[source_index]) for kline in klines]
+    
+    rsi_series = RSIIndicator(close=pd.Series(closes), window=int(period)).rsi().dropna()
+    
+    return {
+        "rsi_array": [float(v) for v in rsi_series.tolist()]
+    }
 
-        return {
-            "symbol": symbol,
-            "rsi_array": rsi_vals_array,
-            **rsi_vals,
-            **rsi_crs,
-            **rsi_sts,
-            **rsi_lst,
-            **rsi_trd,
-            **rsi_avg
-        }
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
 
+# ==================== ARRAYS (MACD) ENDPOINT ====================
 @app.get("/arrays/{symbol}")
-def get_symbol_arrays(
+def get_arrays_endpoint(
     symbol: str, 
-    rsiPeriod: int = 14, 
-    rsiSource: str = "close",
-    macdFast: int = 12, 
-    macdSlow: int = 26, 
-    macdSignal: int = 9
+    fast: int = Query(12), 
+    slow: int = Query(26), 
+    signal: int = Query(9)
 ):
     symbol = symbol.upper()
-    with cache_lock:
-        if symbol not in kline_history:
-            raise HTTPException(status_code=404, detail="Symbol not found or not loaded yet")
-        klines = kline_history[symbol]
-
-    try:
-        rsi_array = calculate_rsi_array(klines, period=rsiPeriod, source=rsiSource)
-        macd_arrays = calculate_macd_arrays(klines, fast=macdFast, slow=macdSlow, signal=macdSignal)
-        return JSONResponse(content=jsonable_encoder({
-            "symbol": symbol,
-            "rsi_array": rsi_array,
-            **macd_arrays
-        }))
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    if symbol not in kline_history or not kline_history[symbol]:
+        raise HTTPException(status_code=400, detail="Kline data is empty or symbol not found")
+    
+    klines = kline_history[symbol]
+    closes = [float(kline[4]) for kline in klines]
+    close_series = pd.Series(closes)
+    
+    from ta.trend import MACD
+    macd_indicator = MACD(
+        close=close_series, 
+        window_slow=int(slow), 
+        window_fast=int(fast), 
+        window_sign=int(signal)
+    )
+    
+    return {
+        "macd_line_array": [float(v) if pd.notna(v) else 0.0 for v in macd_indicator.macd().tolist()],
+        "macd_signal_array": [float(v) if pd.notna(v) else 0.0 for v in macd_indicator.macd_signal().tolist()],
+        "macd_histogram_array": [float(v) if pd.notna(v) else 0.0 for v in macd_indicator.macd_diff().tolist()]
+    }
 
 @app.get("/ohlc/{symbol}")
 def get_symbol_ohlc(symbol: str):
