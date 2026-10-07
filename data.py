@@ -158,45 +158,45 @@ import pandas as pd
 from ta.momentum import RSIIndicator
 import traceback
 
+# ==================== RSI ENDPOINT ====================
 @app.get("/rsi/{symbol}")
-def get_rsi_endpoint(
-    symbol: str, 
-    period: int = 7, 
-    source: str = "close"
-):
-    try:
-        symbol = symbol.upper()
-        
-        # Хэрэв kline өгөгдөл байхгүй бол 500 алдаа биш хоосон массив буцааж серверээ хамгаална
-        if symbol not in kline_history or not kline_history[symbol]:
-            return {"rsi_array": []}
-        
+def get_symbol_rsi(symbol: str, period: int = 7):
+    symbol = symbol.upper()
+    with cache_lock:
+        if symbol not in kline_history:
+            raise HTTPException(status_code=404, detail="Symbol not found or not loaded yet")
         klines = kline_history[symbol]
-        
-        # Source-ийн индексийг зөв тодорхойлох
-        source_map = {"open": 1, "high": 2, "low": 3, "close": 4}
-        source_index = source_map.get(str(source).lower(), 4)
-        
-        closes = []
-        for kline in klines:
-            try:
-                closes.append(float(kline[source_index]))
-            except (IndexError, ValueError):
-                continue
-                
-        if len(closes) < int(period):
-            return {"rsi_array": []}
-            
+
+    try:
+        # RSI массивыг авах (таны эхний код дээр байсан хэсэг)
+        closes = [float(kline[4]) for kline in klines]
         rsi_series = RSIIndicator(close=pd.Series(closes), window=int(period)).rsi().dropna()
-        
-        return {
+        rsi_arrays = {
             "rsi_array": [float(v) for v in rsi_series.tolist()]
+        }
+        
+        # rsi.py файлаас бусад утгуудыг MACD шиг нэгтгэж дуудна
+        rsi_vals = calculate_rsi_values(klines, window=period)
+        rsi_crs = calculate_rsi_cross(klines, window=period)
+        rsi_sts = calculate_rsi_states(klines, window=period)
+        rsi_trd = calculate_rsi_trend(klines, window=period)
+        rsi_avg = calculate_rsi_average(klines, window=period)
+        rsi_lst = calculate_rsi_laststatus(klines, window=period)
+
+        return {
+            "symbol": symbol,
+            **rsi_arrays,
+            **rsi_vals,
+            **rsi_crs,
+            **rsi_sts,
+            **rsi_trd,
+            **rsi_avg,
+            **rsi_lst
         }
     except Exception as e:
         print(f"--- RSI ERROR FOR {symbol}: {str(e)} ---")
         traceback.print_exc()
-        # Алдаа гарсан ч сервер унахгүйгээр хоосон массив буцаана
-        return {"rsi_array": []}
+        raise HTTPException(status_code=400, detail=str(e))
         
 # ==================== ARRAYS (MACD) ENDPOINT ====================
 @app.get("/arrays/{symbol}")
