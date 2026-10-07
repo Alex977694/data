@@ -1,13 +1,30 @@
+from collections import deque
+from datetime import datetime, timedelta, timezone
+
+import pandas as pd
+from ta.momentum import RSIIndicator
+
+
+def _format_time_gmt8(timestamp):
+    """Convert a millisecond timestamp to a readable GMT+8 time."""
+    if timestamp is None:
+        return None
+
+    gmt8 = timezone(timedelta(hours=8))
+    return datetime.fromtimestamp(float(timestamp) / 1000.0, tz=gmt8).strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
+
 # ==================== RSI VALUES ====================
 def calculate_rsi_values(klines, window=7):
     """Return the latest four RSI values from kline data."""
-    if not klines or len(klines) < window + 4:
-        raise ValueError("Kline data is too short for the given window")
+    if not klines:
+        raise ValueError("Kline data is empty")
 
     closes = [float(kline[4]) for kline in klines]
     rsi_series = RSIIndicator(
         close=pd.Series(closes),
-        window=int(window), # window-г бүхэл тоо эсэхийг баталгаажуулна
+        window=int(window),
     ).rsi().dropna()
 
     if len(rsi_series) < 4:
@@ -63,14 +80,20 @@ def calculate_rsi_states(klines, window=7):
     ).rsi().dropna()
 
     if len(rsi_series) < 5:
-        return {"cross_history": {}} # Алдаа шидэхийн оронд хоосон буцааж сервер унахаас сэргийлнэ
+        return {"cross_history": {}}
 
     offset = len(klines) - len(rsi_series)
     price_history = {
-        "rsi_30_up": [], "rsi_30_down": [], "rsi_70_up": [], "rsi_70_down": [],
+        "rsi_30_up": [],
+        "rsi_30_down": [],
+        "rsi_70_up": [],
+        "rsi_70_down": [],
     }
     time_history = {
-        "rsi_30_up": [], "rsi_30_down": [], "rsi_70_up": [], "rsi_70_down": [],
+        "rsi_30_up": [],
+        "rsi_30_down": [],
+        "rsi_70_up": [],
+        "rsi_70_down": [],
     }
 
     for index in range(len(rsi_series) - 2, 2, -1):
@@ -209,7 +232,10 @@ def calculate_rsi_average(klines, window=7):
 
     offset = len(klines) - len(rsi_series)
     price_history = {
-        "rsi_30_up": [], "rsi_30_down": [], "rsi_70_up": [], "rsi_70_down": [],
+        "rsi_30_up": [],
+        "rsi_30_down": [],
+        "rsi_70_up": [],
+        "rsi_70_down": [],
     }
 
     for index in range(len(rsi_series) - 2, 2, -1):
@@ -233,3 +259,12 @@ def calculate_rsi_average(klines, window=7):
     return {
         "average_status": (s30u + s70d) / 2.0 if s30u and s70d else None,
     }
+
+__all__ = [
+    "calculate_rsi_values",
+    "calculate_rsi_cross",
+    "calculate_rsi_states",
+    "calculate_rsi_laststatus",
+    "calculate_rsi_trend",
+    "calculate_rsi_average",
+]
