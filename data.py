@@ -150,25 +150,40 @@ def get_selected_symbols():
 from fastapi import FastAPI, HTTPException, Query
 
 # ==================== RSI ENDPOINT ====================
+from fastapi import FastAPI, HTTPException, Query
+import traceback
+
 @app.get("/rsi/{symbol}")
-def get_rsi_endpoint(symbol: str, period: int = Query(7), source: str = Query("close")):
-    symbol = symbol.upper()
-    if symbol not in kline_history or not kline_history[symbol]:
-        raise HTTPException(status_code=400, detail="Kline data is empty or symbol not found")
-    
-    klines = kline_history[symbol]
-    
-    # Source сонгох логик (Open, High, Low, Close)
-    source_index = {"open": 1, "high": 2, "low": 3, "close": 4}.get(source.lower(), 4)
-    closes = [float(kline[source_index]) for kline in klines]
-    
-    rsi_series = RSIIndicator(close=pd.Series(closes), window=int(period)).rsi().dropna()
-    
-    return {
-        "rsi_array": [float(v) for v in rsi_series.tolist()]
-    }
-
-
+def get_rsi_endpoint(
+    symbol: str, 
+    period: int = Query(7, description="RSI period"), 
+    source: str = Query("close", description="Price source")
+):
+    try:
+        symbol = symbol.upper()
+        if symbol not in kline_history or not kline_history[symbol]:
+            raise HTTPException(status_code=404, detail=f"Symbol {symbol} not found or klines empty")
+        
+        klines = kline_history[symbol]
+        
+        # Source сонгох логик
+        source_index = {"open": 1, "high": 2, "low": 3, "close": 4}.get(source.lower(), 4)
+        closes = [float(kline[source_index]) for kline in klines]
+        
+        if len(closes) < period:
+            return {"rsi_array": []} # Өгөгдлийн урт хүрэхгүй бол хоосон массив буцаана
+            
+        rsi_series = RSIIndicator(close=pd.Series(closes), window=int(period)).rsi().dropna()
+        
+        return {
+            "rsi_array": [float(v) for v in rsi_series.tolist()]
+        }
+    except Exception as e:
+        # Сервер дээр яг ямар алдаа гарсныг console дээр тод харуулна
+        print(f"--- RSI ERROR FOR {symbol}: {str(e)} ---")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+        
 # ==================== ARRAYS (MACD) ENDPOINT ====================
 @app.get("/arrays/{symbol}")
 def get_arrays_endpoint(
