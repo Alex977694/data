@@ -59,6 +59,53 @@ document.addEventListener("DOMContentLoaded",()=>{
  const intervalEl=document.getElementById("interval");
  const coinEl=document.getElementById("coin");
 
+ const container = document.getElementById("metaChartContainer");
+    
+    // 1. Графикийн дээр эсвэл дотор байрлах Indicator Control Panel HTML үүсгэх
+    const controlPanel = document.createElement("div");
+    controlPanel.style.cssText = "display: flex; gap: 10px; padding: 10px; background: #1f2937; color: #fff; align-items: center; flex-wrap: wrap; border-bottom: 1px solid #374151;";
+    controlPanel.innerHTML = `
+        <span style="font-weight: bold; font-size: 12px; color: #fbbf24;">INDICATORS:</span>
+        <label>RSI P:</label>
+        <input id="chartRsiPeriod" type="number" value="7" style="width: 50px; background: #374151; color: #fff; border: 1px solid #4b5563; padding: 2px 5px;">
+        
+        <label>Src:</label>
+        <select id="chartRsiSource" style="background: #374151; color: #fff; border: 1px solid #4b5563; padding: 2px 5px;">
+            <option value="open">OPEN</option>
+            <option value="high">HIGH</option>
+            <option value="low">LOW</option>
+            <option value="close" selected>CLOSE</option>
+        </select>
+
+        <label>MACD Fast:</label>
+        <input id="chartMacdFast" type="number" value="12" style="width: 50px; background: #374151; color: #fff; border: 1px solid #4b5563; padding: 2px 5px;">
+        
+        <label>Slow:</label>
+        <input id="chartMacdSlow" type="number" value="26" style="width: 50px; background: #374151; color: #fff; border: 1px solid #4b5563; padding: 2px 5px;">
+        
+        <label>Signal:</label>
+        <input id="chartMacdSignal" type="number" value="9" style="width: 50px; background: #374151; color: #fff; border: 1px solid #4b5563; padding: 2px 5px;">
+
+        <button id="chartApplyBtn" style="background: #2563eb; color: #fff; border: none; padding: 4px 12px; cursor: pointer; border-radius: 4px; font-weight: bold;">Apply</button>
+    `;
+
+    // Контейнерийн өмнө эсвэл дотор байрлуулах
+    container.parentNode.insertBefore(controlPanel, container);
+
+    // 2. Apply товчлуурт Event listener холбож утгыг нь сервер рүү эсвэл бэктест рүү дамжуулах
+    document.getElementById("chartApplyBtn").addEventListener("click", function() {
+        const rsiPeriod = document.getElementById("chartRsiPeriod").value;
+        const rsiSource = document.getElementById("chartRsiSource").value;
+        const macdFast = document.getElementById("chartMacdFast").value;
+        const macdSlow = document.getElementById("chartMacdSlow").value;
+        const macdSignal = document.getElementById("chartMacdSignal").value;
+
+        console.log("Applying indicators from Chart UI:", { rsiPeriod, rsiSource, macdFast, macdSlow, macdSignal });
+        
+        // Энд та өөрийн индикаторыг шинэчлэх функцээ дуудах эсвэл глобал хувьсагчид оноож өгнө.
+        // Жишээ нь: updateIndicatorsAndRedraw(rsiPeriod, rsiSource, macdFast, macdSlow, macdSignal);
+    });
+
  let symbol="GOLD",interval="1m";
 
  window.allData=[];
