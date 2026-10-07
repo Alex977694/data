@@ -148,17 +148,14 @@ def get_selected_symbols():
         return {"selected_symbols": list(selected_symbols)}
     
 @app.get("/rsi/{symbol}")
-def get_rsi_data(
-    symbol: str, 
-    period: int = 14, 
-    source: str = "close"
-):
+def get_rsi_data(symbol: str, period: int = 14):
     symbol = symbol.upper()
     with cache_lock:
         if symbol not in kline_history:
+            print(f"DEBUG: Symbol {symbol} not in kline_history! Available: {list(kline_history.keys())}")
             raise HTTPException(status_code=404, detail="Symbol not found or not loaded yet")
         klines = kline_history[symbol]
-
+        print(f"DEBUG: Found {len(klines)} klines for {symbol}")
     try:
         # RSI функцүүддээ period болон source параметрүүдийг дамжуулна
         rsi_vals_array = calculate_rsi_array(klines, period=period, source=source)
