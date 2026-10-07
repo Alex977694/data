@@ -1,7 +1,6 @@
 import pandas as pd
 from ta.momentum import RSIIndicator
 
-
 def calculate_rsi_array(klines, window=7):
     """Return the complete RSI array for frontend/chart use."""
     if not klines:
@@ -10,11 +9,10 @@ def calculate_rsi_array(klines, window=7):
     closes = [float(kline[4]) for kline in klines]
     rsi_series = RSIIndicator(
         close=pd.Series(closes),
-        window=window,
+        window=int(window),
     ).rsi().dropna()
 
     return [float(value) for value in rsi_series.tolist()]
-
 
 def calculate_macd_arrays(klines, fast=12, slow=26, signal=9):
     """Return the complete MACD, signal, and histogram arrays."""
