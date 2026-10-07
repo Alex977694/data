@@ -7,7 +7,6 @@
 window.dispatchChartUpdate=function(){};
 window.macdMode='normal';   // 'normal' | 'max' | 'min'
 window.rsiMode='normal';
-window.atrMode='normal';
 
 function formatPrice(p){
  p=Number(p);
@@ -67,7 +66,6 @@ document.addEventListener("DOMContentLoaded",()=>{
  window.macdArrayData = [];
  window.signalArrayData = [];
  window.histArrayData = [];
- window.atrArrayData = [];
  window.backtestEvents=[];
 
  let visibleCount=500,offset=0;
@@ -124,12 +122,12 @@ document.addEventListener("DOMContentLoaded",()=>{
 
   /* Panel-ийн өндрийн харьцаа */
     /* Panel-ийн өндрийн харьцаа */
-  const R={main:.52,macd:.16,rsi:.16,atr:.16};
-  [["macd",window.macdMode],["rsi",window.rsiMode],["atr",window.atrMode]].forEach(([k,m])=>{
-   if(m==='max'){Object.assign(R,{main:.2,macd:.2,rsi:.2,atr:.2});R[k]=.4}
-   else if(m==='min'){Object.assign(R,{main:.55,macd:.2,rsi:.2,atr:.2});R[k]=.05}
+  const R={main:.68,macd:.16,rsi:.16};
+  [["macd",window.macdMode],["rsi",window.rsiMode]].forEach(([k,m])=>{
+   if(m==='max'){Object.assign(R,{main:.2,macd:.2,rsi:.2});R[k]=.4}
+   else if(m==='min'){Object.assign(R,{main:.55,macd:.2,rsi:.2});R[k]=.05}
   });
-  const mainRatio=R.main,macdRatio=R.macd,rsiRatio=R.rsi,atrRatio=R.atr;
+  const mainRatio=R.main,macdRatio=R.macd,rsiRatio=R.rsi;
 
   const mainChartHeight=chartHeight*mainRatio;
   const priceToY=p=>padding+(maxPrice-p)/(maxPrice-minPrice)*mainChartHeight;
@@ -273,7 +271,6 @@ document.addEventListener("DOMContentLoaded",()=>{
 
   drawMACD(ctx,data,window.macdArrayData,window.signalArrayData,window.histArrayData,padding,chartWidth,chartHeight,candleWidth,mouse,mainChartHeight,macdRatio);
   drawRSI(ctx,data,window.rsiArrayData,padding,chartWidth,chartHeight,candleWidth,mouse,mainChartHeight,macdRatio,rsiRatio);
-  drawATR(ctx,data,window.atrArrayData,padding,chartWidth,chartHeight,candleWidth,mouse,mainChartHeight,macdRatio,rsiRatio,atrRatio);
  }
 
  window.redrawChart=draw;
@@ -418,9 +415,8 @@ function startLivePolling(symbol) {
   const panels=[
   ["macdMode","_macdTop","_btnMaxX","_btnNormX","_btnMinX"],
   ["rsiMode","_rsiTop","_btnRsiMaxX","_btnRsiNormX","_btnRsiMinX"],
-  ["atrMode","_atrTop","_btnAtrMaxX","_btnAtrNormX","_btnAtrMinX"]
  ];
- const resetModes=()=>{window.macdMode=window.rsiMode=window.atrMode='normal'};
+ const resetModes=()=>{window.macdMode=window.rsiMode=window};
 
  canvas.addEventListener("click",e=>{
   const rect=canvas.getBoundingClientRect();
@@ -621,60 +617,6 @@ function drawRSI(ctx,data,rsiArray,padding,chartWidth,chartHeight,candleWidth,mo
   drawLabels(ctx,padding+10,rsiTop+6,[["RSI(7): ",Number(rsiArray[g]).toFixed(2),"#e91e63"]]);
 
  drawWindowButtons(ctx,rsiTop,chartWidth,padding,'_btnRsiMaxX','_btnRsiNormX','_btnRsiMinX');
-}
-
-function drawATR(ctx,data,atrArray,padding,chartWidth,chartHeight,candleWidth,mouseObj,mainChartHeight,macdRatio,rsiRatio,atrRatio){
- if(!atrArray||!atrArray.length)return;
-
- const startIdx=(window._chartStartIndex??0)+(atrArray.length-window.allData.length);
- const atrTop=padding+mainChartHeight+chartHeight*(macdRatio+rsiRatio)+30;
- window._atrTop=atrTop;
- const atrHeight=chartHeight*atrRatio-20;
-
- const vis=[];
- data.forEach((d,i)=>{
-  const idx=startIdx+i;
-  const v=idx>=0&&idx<atrArray.length?atrArray[idx]:null;
-  if(Number.isFinite(v))vis.push(v);
- });
-
- let maxA=vis.length?Math.max(...vis):1,minA=vis.length?Math.min(...vis):0;
- if(maxA===minA){maxA+=1;minA-=1}
- const pd=(maxA-minA)*0.1;maxA+=pd;minA-=pd;
- const atrToY=v=>atrTop+atrHeight-((v-minA)/(maxA-minA))*atrHeight;
-
- ctx.strokeStyle="#1f2630";
- ctx.lineWidth=1;
- ctx.beginPath();ctx.moveTo(padding,atrTop);ctx.lineTo(padding+chartWidth,atrTop);ctx.stroke();
-
- if(window.atrMode!=='min'){
-  ctx.strokeStyle="#22d3ee";
-  ctx.lineWidth=1.5;
-  ctx.beginPath();
-  let started=false;
-  data.forEach((d,i)=>{
-   const idx=startIdx+i;
-   const v=idx>=0&&idx<atrArray.length?atrArray[idx]:null;
-   if(!Number.isFinite(v))return;
-   const x=padding+i*candleWidth+candleWidth/2,y=atrToY(v);
-   started?ctx.lineTo(x,y):ctx.moveTo(x,y);
-   started=true;
-  });
-  ctx.stroke();
-
-  /* min/max шкал */
-  ctx.font="9px Arial";ctx.textBaseline="middle";ctx.fillStyle="#666";
-  ctx.fillText(maxA.toFixed(2),padding+chartWidth+5,atrToY(maxA));
-  ctx.fillText(minA.toFixed(2),padding+chartWidth+5,atrToY(minA));
- }
-
- const g=startIdx+activeIndex(mouseObj,padding,chartWidth,candleWidth,data.length);
- if(g>=0&&g<atrArray.length&&Number.isFinite(atrArray[g])){
-  const per=typeof indicatorSettings!=="undefined"?indicatorSettings.atrPeriod:14;
-  drawLabels(ctx,padding+10,atrTop+6,[[`ATR(${per}): `,Number(atrArray[g]).toFixed(3),"#22d3ee"]]);
- }
-
- drawWindowButtons(ctx,atrTop,chartWidth,padding,'_btnAtrMaxX','_btnAtrNormX','_btnAtrMinX');
 }
 
 function drawBacktestEvents(ctx,data,padding,chartWidth,candleWidth,priceToY,start){
