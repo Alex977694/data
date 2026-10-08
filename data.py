@@ -436,36 +436,158 @@ def backtest_page():
 
 @app.get("/api/gold")
 def get_gold_for_backtest():
+    symbol = "GOLD"
+
     with cache_lock:
-        if "GOLD" not in kline_history:
+        if symbol not in kline_history:
             raise HTTPException(
                 status_code=404,
                 detail="GOLD candle data not loaded"
             )
 
-        rows = kline_history["GOLD"]
+        rows = list(kline_history[symbol])
 
+        quote = market_quotes.get(
+            symbol,
+            {
+                "bid": 0.0,
+                "ask": 0.0
+            }
+        )
+
+    if not rows:
+        raise HTTPException(
+            status_code=404,
+            detail="GOLD candle data is empty"
+        )
+
+    try:
+        # =========================
+        # BASIC OHLCV
+        # =========================
+        df = pd.DataFrame(
+            rows,
+            columns=[
+                "open_time",
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+                "close_time"
+            ]
+        )
+
+        for col in [
+            "open_time",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+        ]:
+            df[col] = pd.to_numeric(
+                df[col],
+                errors="coerce"
+            )
+
+        # =========================
+        # RSI 7
+        # =========================
+        df["rsi"] = RSIIndicator(
+            close=df["close"],
+            window=7
+        ).rsi()
+
+        # =========================
+        # MACD 12 / 26 / 9
+        # =========================
+        macd = MACD(
+            close=df["close"],
+            window_fast=12,
+            window_slow=26,
+            window_sign=9
+        )
+
+        df["macd_line"] = macd.macd()
+        df["macd_signal"] = macd.macd_signal()
+        df["macd_histogram"] = macd.macd_diff()
+
+        # =========================
+        # CURRENT REAL MT5 QUOTE
+        # =========================
+        current_bid = float(
+            quote.get("bid", 0.0)
+        )
+
+        current_ask = float(
+            quote.get("ask", 0.0)
+        )
+
+        # =========================
+        # BUILD FRONTEND DATA
+        # =========================
         candles = []
-        for row in rows:
-            candles.append({
-                "open_time": float(row[0]),
-                "open": float(row[1]),
-                "high": float(row[2]),
-                "low": float(row[3]),
-                "close": float(row[4]),
-                "volume": float(row[5]),
-                "rsi": None,
-                "macd_line": None,
-                "macd_signal": None,
-                "macd_histogram": None,
-                "bid": float(row[4]),
-                "ask": float(row[4]) + 0.30
-            })
+
+        for i, row in df.iterrows():
+
+            candle = {
+                "open_time": float(row["open_time"]),
+                "open": float(row["open"]),
+                "high": float(row["high"]),
+                "low": float(row["low"]),
+                "close": float(row["close"]),
+                "volume": float(row["volume"]),
+
+                "rsi": (
+                    float(row["rsi"])
+                    if pd.notna(row["rsi"])
+                    else None
+                ),
+
+                "macd_line": (
+                    float(row["macd_line"])
+                    if pd.notna(row["macd_line"])
+                    else None
+                ),
+
+                "macd_signal": (
+                    float(row["macd_signal"])
+                    if pd.notna(row["macd_signal"])
+                    else None
+                ),
+
+                "macd_histogram": (
+                    float(row["macd_histogram"])
+                    if pd.notna(row["macd_histogram"])
+                    else None
+                ),
+
+                # Real MT5 quote
+                "bid": current_bid,
+                "ask": current_ask
+            }
+
+            candles.append(candle)
+
+    except Exception as e:
+        print(f"[GOLD API ERROR] {e}")
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to calculate GOLD indicators: {str(e)}"
+        )
 
     return {
-        "symbol": "GOLD",
+        "symbol": symbol,
         "timeframe": "1m",
         "count": len(candles),
+
+        "quote": {
+            "bid": current_bid,
+            "ask": current_ask
+        },
+
         "candles": candles
     }
         
