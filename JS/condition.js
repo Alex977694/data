@@ -90,7 +90,6 @@ fields.forEach(([field,label])=>{
  "LONG_COUNT","SHORT_COUNT","MAX_LONG_REACHED","MAX_SHORT_REACHED",
  "NOT_MAX_LONG_REACHED","NOT_MAX_SHORT_REACHED","LONG_PNL","SHORT_PNL","TOTAL_FLOATING_PNL",
  "LAST_LONG_PNL","LAST_SHORT_PNL","MAX_LONG_PNL","MAX_SHORT_PNL",
- "MACD_LAST_STATUS","MACD_PREV_MIN","MACD_PREV_MAX",
  "PEAK_ATR","GIVEBACK_ATR"
 ].forEach(name=>values.push({name,dynamic:true}));
 
@@ -118,11 +117,6 @@ const PRESETS=[
  V("MACD_HISTOGRAM1",">","MACD_HISTOGRAM2"),V("MACD_HISTOGRAM1","<","MACD_HISTOGRAM2"),
  NUM("MACD_HISTOGRAM1",">"),NUM("MACD_HISTOGRAM1","<"),
  NUM("MACD_LINE1",">"),NUM("MACD_LINE1","<"),
-
- V("MACD_LAST_STATUS","<","MACD_PREV_MIN"),V("MACD_LAST_STATUS",">","MACD_PREV_MAX"),
- NUM("MACD_LAST_STATUS",">"),NUM("MACD_LAST_STATUS","<"),
- NUM("MACD_PREV_MIN",">"),NUM("MACD_PREV_MIN","<"),
- NUM("MACD_PREV_MAX",">"),NUM("MACD_PREV_MAX","<"),
 
  V("CLOSE0",">","CLOSE1"),V("CLOSE0","<","CLOSE1"),
  V("HIGH0",">","HIGH1"),V("HIGH0","<","HIGH1"),
@@ -195,9 +189,6 @@ const dynGet={
  LAST_SHORT_PNL:c=>c.lastShortPnl??null,
  MAX_LONG_PNL:c=>c.maxLongPnl??null,
  MAX_SHORT_PNL:c=>c.maxShortPnl??null,
- MACD_LAST_STATUS:c=>c.macdLastStatus??null,
- MACD_PREV_MIN:c=>c.macdPrevMin??null,
- MACD_PREV_MAX:c=>c.macdPrevMax??null,
  MAX_LONG_REACHED:c=>N0(c.longCount)>=Number(maxPositions.LONG),
  MAX_SHORT_REACHED:c=>N0(c.shortCount)>=Number(maxPositions.SHORT),
  NOT_MAX_LONG_REACHED:c=>N0(c.longCount)<Number(maxPositions.LONG),
