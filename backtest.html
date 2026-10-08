@@ -363,46 +363,6 @@ const fin=Number.isFinite;
 
 function sourceValue(c,s){const x=Number(c[s]);return fin(x)?x:null}
 
-function calculateRSI(data,p,source){
- const out=nulls(data.length);
- if(data.length<=p)return out;
- const pr=data.map(c=>sourceValue(c,source));
- let gs=0,ls=0;
- for(let i=1;i<=p;i++){const d=pr[i]-pr[i-1];d>0?gs+=d:ls-=d}
- let ag=gs/p,al=ls/p;
- const rv=(g,l)=>l===0?(g===0?50:100):100-100/(1+g/l);
- out[p]=rv(ag,al);
- for(let i=p+1;i<data.length;i++){
-  const d=pr[i]-pr[i-1];
-  ag=(ag*(p-1)+(d>0?d:0))/p;
-  al=(al*(p-1)+(d<0?-d:0))/p;
-  out[i]=rv(ag,al);
- }
- return out;
-}
-
-function calculateEMA(data,p){
- const out=nulls(data.length);
- if(data.length<p)return out;
- let ema=sum(data.slice(0,p))/p;
- out[p-1]=ema;
- const m=2/(p+1);
- for(let i=p;i<data.length;i++){ema=(data[i]-ema)*m+ema;out[i]=ema}
- return out;
-}
-
-function calculateMACD(data,fast,slow,signal){
- const close=data.map(c=>Number(c.close));
- const fe=calculateEMA(close,fast),se=calculateEMA(close,slow);
- const line=data.map((_,i)=>fin(fe[i])&&fin(se[i])?fe[i]-se[i]:null);
- const valid=[],idx=[];
- line.forEach((x,i)=>{if(fin(x)){valid.push(x);idx.push(i)}});
- const sig=nulls(data.length);
- calculateEMA(valid,signal).forEach((x,i)=>{if(fin(x))sig[idx[i]]=x});
- const histogram=data.map((_,i)=>fin(line[i])&&fin(sig[i])?line[i]-sig[i]:null);
- return{line,signal:sig,histogram};
-}
-
 function applyIndicators(){
  const rp=parseInt($("rsiPeriod").value.trim(),10);
  const rs=$("rsiSource").value;
@@ -445,16 +405,6 @@ if(!Array.isArray(candles) || candles.length === 0){
 
     return;
 }
-
- const rsi=calculateRSI(candles,rp,rs);
- const macd=calculateMACD(candles,mf,ms,mg);
-
- candles.forEach((c,i)=>{
-   c.rsi=rsi[i];
-   c.macd_line=macd.line[i];
-   c.macd_signal=macd.signal[i];
-   c.macd_histogram=macd.histogram[i];
- });
 
  /* ==========================================
     UPDATE META CHART DIRECTLY
