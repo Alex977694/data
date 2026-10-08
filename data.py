@@ -433,6 +433,41 @@ def backtest_page():
             status_code=404,
             detail="backtest.html файл олдсонгүй!"
         )
+
+@app.get("/api/gold")
+def get_gold_for_backtest():
+    with cache_lock:
+        if "GOLD" not in kline_history:
+            raise HTTPException(
+                status_code=404,
+                detail="GOLD candle data not loaded"
+            )
+
+        rows = kline_history["GOLD"]
+
+        candles = []
+        for row in rows:
+            candles.append({
+                "open_time": float(row[0]),
+                "open": float(row[1]),
+                "high": float(row[2]),
+                "low": float(row[3]),
+                "close": float(row[4]),
+                "volume": float(row[5]),
+                "rsi": None,
+                "macd_line": None,
+                "macd_signal": None,
+                "macd_histogram": None,
+                "bid": float(row[4]),
+                "ask": float(row[4]) + 0.30
+            })
+
+    return {
+        "symbol": "GOLD",
+        "timeframe": "1m",
+        "count": len(candles),
+        "candles": candles
+    }
         
 @app.get("/price/{symbol}")
 def get_symbol_live_price(symbol: str):
