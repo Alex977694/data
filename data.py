@@ -810,14 +810,35 @@ def receive_gold_candles(data: dict):
     try:
         formatted_candles = []
         for x in candles:
-            # MT5 time секунд бол миллисекунд болгоно (* 1000)
-            t = int(x[0]) * 1000 if int(x[0]) < 10000000000 else int(x[0])
+            raw_time = int(x[0])
+        
+            t = raw_time * 1000 if raw_time < 10000000000 else raw_time
+        
+            utc_time = datetime.fromtimestamp(
+                t / 1000,
+                tz=timezone.utc
+            )
+        
+            gmt8_time = utc_time.astimezone(
+                timezone(timedelta(hours=8))
+            )
+        
+            print(
+                f"[GOLD TIME DEBUG] "
+                f"raw={raw_time} | "
+                f"UTC={utc_time.strftime('%Y-%m-%d %H:%M:%S')} | "
+                f"GMT+8={gmt8_time.strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+        
             o = float(x[1])
             h = float(x[2])
             l = float(x[3])
             c = float(x[4])
             v = float(x[5])
-            formatted_candles.append([t, o, h, l, c, v, t])
+        
+            formatted_candles.append([
+                t, o, h, l, c, v, t
+            ])
 
         with cache_lock:
             kline_history[symbol] = formatted_candles
