@@ -6,7 +6,7 @@ from datetime import datetime, timezone, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import websocket
 from binance.um_futures import UMFutures
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 import uvicorn
@@ -427,13 +427,15 @@ def get_binchart():
 def backtest_py():
     try:
         with open("backtest.py", "r", encoding="utf-8") as f:
-            return f.read()
+            code_content = f.read()
+        # Хэрэв backtest.py файлыг доторх HTML/UI загвартайгаар нь вэб браузер дээр харуулах бол:
+        return HTMLResponse(content=code_content, status_code=200)
     except FileNotFoundError:
         raise HTTPException(
             status_code=404,
             detail="backtest.py файл олдсонгүй!"
         )
-
+        
 @app.get("/price/{symbol}")
 def get_symbol_live_price(symbol: str):
     symbol = symbol.upper()
