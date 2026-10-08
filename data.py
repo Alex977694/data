@@ -424,12 +424,15 @@ def get_binchart():
         raise HTTPException(status_code=404, detail="binchart.html файл олдсонгүй!")
 
 @app.get("/backtest.py", response_class=HTMLResponse)
-def backtest.py():
+def backtest_py():
     try:
         with open("backtest.py", "r", encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="backtest.py файл олдсонгүй!")
+        raise HTTPException(
+            status_code=404,
+            detail="backtest.py файл олдсонгүй!"
+        )
 
 @app.get("/price/{symbol}")
 def get_symbol_live_price(symbol: str):
