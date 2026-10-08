@@ -1,5 +1,4 @@
 from flask import Flask, jsonify, render_template_string, request, send_from_directory
-import numpy as np
 import os
 import requests
 
@@ -8,31 +7,49 @@ JS_DIR = os.path.join(BASE_DIR, "JS")
 
 app = Flask(__name__)
 
-RAILWAY_GOLD_URL = "https://web-production-c3082.up.railway.app/candles/GOLD"
+RAILWAY_GOLD_URL = (
+    "https://web-production-c3082.up.railway.app/candles/GOLD"
+)
+
 
 def load_backtest_data(limit=None):
     try:
-        r = requests.get(RAILWAY_GOLD_URL, timeout=30)
+        r = requests.get(
+            RAILWAY_GOLD_URL,
+            timeout=30
+        )
+
         r.raise_for_status()
+
         payload = r.json()
-        
+
         if "candles" not in payload:
-            raise KeyError("Railway response does not contain 'candles'")
-            
+            raise KeyError(
+                "Railway response does not contain 'candles'"
+            )
+
         raw = payload["candles"]
+
         if not isinstance(raw, list):
             raise ValueError("'candles' must be a list")
-            
+
         if limit is not None:
             limit = int(limit)
+
             if limit <= 0:
-                raise ValueError("Candle limit must be greater than 0")
+                raise ValueError(
+                    "Candle limit must be greater than 0"
+                )
+
             raw = raw[-limit:]
-            
+
         candles = []
+
         for row in raw:
+
             if len(row) < 6:
                 continue
+
             candles.append({
                 "open_time": float(row[0]),
                 "open": float(row[1]),
@@ -40,22 +57,32 @@ def load_backtest_data(limit=None):
                 "low": float(row[3]),
                 "close": float(row[4]),
                 "volume": float(row[5]),
+
                 "rsi": None,
                 "macd_line": None,
                 "macd_signal": None,
                 "macd_histogram": None,
+
                 "bid": float(row[4]),
                 "ask": float(row[4]) + 0.30
             })
-            
+
         if not candles:
-            raise ValueError("Railway returned no valid GOLD candles")
-            
-        print(f"[RAILWAY] Loaded {len(candles)} GOLD candles")
+            raise ValueError(
+                "Railway returned no valid GOLD candles"
+            )
+
+        print(
+            f"[RAILWAY] Loaded {len(candles)} GOLD candles"
+        )
+
         return candles
-        
+
     except requests.RequestException as e:
-        raise RuntimeError(f"Railway GOLD API request failed: {e}")
+
+        raise RuntimeError(
+            f"Railway GOLD API request failed: {e}"
+        )
 
 HTML=r"""<!DOCTYPE html>
 <html>
@@ -1240,13 +1267,35 @@ def gold_api():
         print("GOLD API ERROR:", repr(e))
         return jsonify({"error": str(e)}), 500
 
+# ============================================================
+# HEALTH CHECK
+# ============================================================
+
+@app.route("/health")
+def health():
+
+    return jsonify({
+        "status": "ok",
+        "service": "gold-backtest"
+    })
+
+
+# ============================================================
+# START
+# ============================================================
+
 if __name__ == "__main__":
-    print("\n".join([
-        "="*60,
-        "GOLD HEDGE BACKTEST SERVER",
-        "="*60,
-        "HTML : http://127.0.0.1:5000/",
-        "API  : http://127.0.0.1:5000/api/gold",
-        "="*60
-    ]))
-    app.run(host="127.0.0.1", port=5000, debug=True)
+
+    print("=" * 60)
+    print("GOLD HEDGE BACKTEST SERVER")
+    print("=" * 60)
+    print("HTML  : http://127.0.0.1:5000/")
+    print("API   : http://127.0.0.1:5000/api/gold")
+    print("HEALTH: http://127.0.0.1:5000/health")
+    print("=" * 60)
+
+    app.run(
+        host="0.0.0.0",
+        port=5000,
+        debug=False
+    )
