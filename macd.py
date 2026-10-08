@@ -2,10 +2,6 @@ import datetime
 
 import pandas as pd
 
-MACD_FAST = 12
-MACD_SLOW = 26
-MACD_SIGNAL = 9
-
 
 def _format_time_gmt8(timestamp):
     gmt8 = datetime.timezone(datetime.timedelta(hours=8))
@@ -15,20 +11,21 @@ def _format_time_gmt8(timestamp):
     ).strftime("%Y-%m-%d %H:%M:%S")
 
 
-def _calculate_macd_series(klines, fast=MACD_FAST, slow=MACD_SLOW, signal=MACD_SIGNAL):
+def _calculate_macd_series(klines, fast=12, slow=26, signal=9):
+    """Нэгдсэн байдлаар MACD цувааг тооцоолох туслах функц."""
     if not klines:
         raise ValueError("Kline data is empty")
     closes = pd.Series([float(kline[4]) for kline in klines])
-    fast_ema = closes.ewm(span=fast, adjust=False).mean()
-    slow_ema = closes.ewm(span=slow, adjust=False).mean()
+    fast_ema = closes.ewm(span=int(fast), adjust=False).mean()
+    slow_ema = closes.ewm(span=int(slow), adjust=False).mean()
     macd_line = fast_ema - slow_ema
-    macd_signal = macd_line.ewm(span=signal, adjust=False).mean()
+    macd_signal = macd_line.ewm(span=int(signal), adjust=False).mean()
     return macd_line, macd_signal, macd_line - macd_signal
 
 
 # ==================== MACD VALUES ====================
-def calculate_macd_values(klines):
-    macd_line, macd_signal, macd_histogram = _calculate_macd_series(klines)
+def calculate_macd_values(klines, fast=12, slow=26, signal=9):
+    macd_line, macd_signal, macd_histogram = _calculate_macd_series(klines, fast, slow, signal)
     if len(macd_line) < 5:
         raise ValueError("At least five MACD values are required")
     return {
@@ -49,9 +46,10 @@ def calculate_macd_values(klines):
         "previous_4_macd_histogram": f"{macd_histogram.iloc[-5]:.8f}",
     }
 
+
 # ==================== MACD CROSS ====================
-def calculate_macd_cross(klines):
-    macd_line, macd_signal, _ = _calculate_macd_series(klines)
+def calculate_macd_cross(klines, fast=12, slow=26, signal=9):
+    macd_line, macd_signal, _ = _calculate_macd_series(klines, fast, slow, signal)
     if len(macd_line) < 3:
         raise ValueError("At least three MACD values are required")
     previous_macd_line = macd_line.iloc[-2]
@@ -71,8 +69,8 @@ def calculate_macd_cross(klines):
 
 
 # ==================== MACD STATE ====================
-def calculate_macd_state(klines):
-    macd_line, macd_signal, _ = _calculate_macd_series(klines)
+def calculate_macd_state(klines, fast=12, slow=26, signal=9):
+    macd_line, macd_signal, _ = _calculate_macd_series(klines, fast, slow, signal)
     previous_macd_line = macd_line.iloc[-2]
     previous_macd_signal = macd_signal.iloc[-2]
     return {
@@ -84,8 +82,8 @@ def calculate_macd_state(klines):
 
 
 # ==================== MACD TREND ====================
-def calculate_macd_trend(klines):
-    macd_line, macd_signal, _ = _calculate_macd_series(klines)
+def calculate_macd_trend(klines, fast=12, slow=26, signal=9):
+    macd_line, macd_signal, _ = _calculate_macd_series(klines, fast, slow, signal)
     if len(macd_line) < 3:
         raise ValueError("At least three MACD values are required")
     trend = "None"
@@ -99,13 +97,47 @@ def calculate_macd_trend(klines):
     return {"macd_trend": trend}
 
 
+# ==================== MACD PEAKS ====================
+def calculate_macd_peaks(klines, fast=12, slow=26, signal=9):
+    """Return the latest positive peak and negative trough prices."""
+    macd_line, _, _ = _calculate_macd_series(klines, fast, slow, signal)
+    offset = len(klines) - len(macd_line)
+    up_crossings = []
+    down_crossings = []
+
+    for index in range(1, len(macd_line) - 1):
+        previous_2_macd_line = macd_line.iloc[index - 1]
+        previous_macd_line = macd_line.iloc[index]
+        if previous_2_macd_line <= 0 < previous_macd_line:
+            up_crossings.append(index)
+        elif previous_2_macd_line >= 0 > previous_macd_line:
+            down_crossings.append(index)
+
+    def find_peak(start_index, positive):
+        if start_index is None:
+            return {"macd_value": 0.0, "price": 0.0}
+        values = macd_line.iloc[start_index : len(macd_line) - 1]
+        value = max(values) if positive else min(values)
+        index = values.tolist().index(value) + start_index
+        kline_index = index + offset
+        return {
+            "macd_value": float(value),
+            "price": float(klines[kline_index][1]) if 0 <= kline_index < len(klines) else 0.0,
+        }
+
+    return {
+        "macd_peak": find_peak(up_crossings[-1] if up_crossings else None, True),
+        "macd_trough": find_peak(down_crossings[-1] if down_crossings else None, False),
+    }
+
+
 # ==================== MACD AVERAGE ====================
-def calculate_macd_average(klines):
-    macd_line, _, _ = _calculate_macd_series(klines)
+def calculate_macd_average(klines, fast=12, slow=26, signal=9):
+    macd_line, _, _ = _calculate_macd_series(klines, fast, slow, signal)
     if len(macd_line) < 4:
         raise ValueError("At least four MACD values are required")
     values = [float(value) for value in macd_line.iloc[-5:-1]]
-    peaks = calculate_macd_peaks(klines)
+    peaks = calculate_macd_peaks(klines, fast, slow, signal)  # <-- Дамжуулж байна
     peak_value = peaks["macd_peak"]["macd_value"]
     trough_value = peaks["macd_trough"]["macd_value"]
     return {
@@ -116,9 +148,9 @@ def calculate_macd_average(klines):
 
 
 # ==================== MACD LIMITS ====================
-def calculate_macd_limits(klines):
+def calculate_macd_limits(klines, fast=12, slow=26, signal=9):
     """Return the latest MACD/signal cross limits from closed candles."""
-    macd_line, macd_signal, _ = _calculate_macd_series(klines)
+    macd_line, macd_signal, _ = _calculate_macd_series(klines, fast, slow, signal)
     if len(macd_line) < 5:
         raise ValueError("At least five MACD values are required")
 
@@ -151,9 +183,9 @@ def calculate_macd_limits(klines):
 
 
 # ==================== MACD INITIAL CROSSES ====================
-def calculate_macd_initial_crosses(klines):
+def calculate_macd_initial_crosses(klines, fast=12, slow=26, signal=9):
     """Return initial zero-line crosses for MACD line and signal line."""
-    macd_line, macd_signal, _ = _calculate_macd_series(klines)
+    macd_line, macd_signal, _ = _calculate_macd_series(klines, fast, slow, signal)
     offset = len(klines) - len(macd_line)
     macd_initial_up = None
     macd_initial_down = None
@@ -201,41 +233,23 @@ def calculate_macd_initial_crosses(klines):
     }
 
 
-# ==================== MACD PEAKS ====================
-def calculate_macd_peaks(klines):
-    """Return the latest positive peak and negative trough prices."""
-    macd_line, _, _ = _calculate_macd_series(klines)
-    offset = len(klines) - len(macd_line)
-    up_crossings = []
-    down_crossings = []
-
-    for index in range(1, len(macd_line) - 1):
-        previous_2_macd_line = macd_line.iloc[index - 1]
-        previous_macd_line = macd_line.iloc[index]
-        if previous_2_macd_line <= 0 < previous_macd_line:
-            up_crossings.append(index)
-        elif previous_2_macd_line >= 0 > previous_macd_line:
-            down_crossings.append(index)
-
-    def find_peak(start_index, positive):
-        if start_index is None:
-            return {"macd_value": 0.0, "price": 0.0}
-        values = macd_line.iloc[start_index : len(macd_line) - 1]
-        value = max(values) if positive else min(values)
-        index = values.tolist().index(value) + start_index
-        kline_index = index + offset
-        return {
-            "macd_value": float(value),
-            "price": float(klines[kline_index][1]) if 0 <= kline_index < len(klines) else 0.0,
-        }
-
+# ==================== ALL MACD INDICATORS (WRAPPER) ====================
+def calculate_all_macd_indicators(klines, fast=12, slow=26, signal=9):
+    """Бүх MACD индикаторуудыг тохируулсан утгаар нэг дор тооцоолох функц."""
     return {
-        "macd_peak": find_peak(up_crossings[-1] if up_crossings else None, True),
-        "macd_trough": find_peak(down_crossings[-1] if down_crossings else None, False),
+        **calculate_macd_values(klines, fast, slow, signal),
+        **calculate_macd_cross(klines, fast, slow, signal),
+        **calculate_macd_state(klines, fast, slow, signal),
+        **calculate_macd_trend(klines, fast, slow, signal),
+        **calculate_macd_average(klines, fast, slow, signal),
+        **calculate_macd_limits(klines, fast, slow, signal),
+        **calculate_macd_initial_crosses(klines, fast, slow, signal),
+        **calculate_macd_peaks(klines, fast, slow, signal),
     }
 
 
 __all__ = [
+    "calculate_macd_values",
     "calculate_macd_cross",
     "calculate_macd_state",
     "calculate_macd_trend",
@@ -243,4 +257,5 @@ __all__ = [
     "calculate_macd_limits",
     "calculate_macd_initial_crosses",
     "calculate_macd_peaks",
+    "calculate_all_macd_indicators",
 ]
