@@ -197,19 +197,28 @@ const dynGet={
  GIVEBACK_ATR:c=>c.givebackAtr??null,
 };
 
-function val(name,i,ctx={}){
- if(dynGet[name])return dynGet[name](ctx);
+function val(name, i, ctx = {}) {
+    if (dynGet[name]) {
+        return dynGet[name](ctx);
+    }
 
- const d=def(name);
- if(!d)return null;
+    const d = def(name);
 
- const data=ctx.data || candles;
+    if (!d) {
+        return null;
+    }
 
- const n=i+d.offset;
- if(n<0 || n>=data.length)return null;
+    const data = ctx.data || candles;
 
- const x=Number(data[n][d.field]);
- return Number.isFinite(x) ? x : null;
+    const n = i + d.offset;
+
+    if (n < 0 || n >= data.length) {
+        return null;
+    }
+
+    const x = Number(data[n][d.field]);
+
+    return Number.isFinite(x) ? x : null;
 }
 
 /* COMPARISON */
