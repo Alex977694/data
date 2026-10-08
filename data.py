@@ -984,13 +984,6 @@ def receive_gold_candles(data: dict):
                 timezone(timedelta(hours=8))
             )
         
-            print(
-                f"[GOLD TIME DEBUG] "
-                f"raw={raw_time} | "
-                f"UTC={utc_time.strftime('%Y-%m-%d %H:%M:%S')} | "
-                f"GMT+8={gmt8_time.strftime('%Y-%m-%d %H:%M:%S')}"
-            )
-        
             o = float(x[1])
             h = float(x[2])
             l = float(x[3])
