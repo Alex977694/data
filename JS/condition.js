@@ -2,6 +2,42 @@
 
 const $ = id => document.getElementById(id);
 
+// ==================== 1. RAILWAY DATAS & CANDLES ====================
+let candles = []; // Глобал candles массив
+
+async function initMarketData() {
+    try {
+        const res = await fetch("https://web-production-c3082.up.railway.app/candles/GOLD");
+        const data = await res.json();
+        
+        console.log("Raw Railway data:", data);
+
+        if (data.candles) {
+            candles = data.candles.map(c => ({
+                open_time: c[0],
+                open: c[1],
+                high: c[2],
+                low: c[3],
+                close: c[4],
+                volume: c[5],
+                rsi: c[6],          
+                macd_line: c[7],
+                macd_signal: c[8],
+                macd_histogram: c[9],
+                atr: c[10],
+                bid: c[11],
+                ask: c[12]
+            }));
+            console.log("✅ Candles loaded into Builder:", candles.length);
+            
+            // Дата амжилттай татагдсаны дараа бусад интерфэйс эсвэл бэктест эхлэх бол энд дуудна
+            // buildGroups();
+        }
+    } catch (e) {
+        console.error("❌ Failed to load candles from Railway:", e);
+    }
+}
+
 const positionMode = {
     LONG: "SINGLE",
     SHORT: "SINGLE"
@@ -438,3 +474,7 @@ function buildGroups(){
  updateModeVisibility("LONG");
  updateModeVisibility("SHORT");
 }
+
+
+initMarketData();
+buildGroups(); // Комментоо арилгавал UI формоороо зурагдаад гарна
