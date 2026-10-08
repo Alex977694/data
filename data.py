@@ -443,10 +443,67 @@ def get_gold_for_backtest():
                 detail="GOLD candle data not loaded"
             )
 
-        rows = kline_history["GOLD"]
+        rows = list(kline_history["GOLD"])
 
+        # Railway дээр хадгалагдаж байгаа бодит Ask/Bid
+        quote = dict(
+            market_quotes.get(
+                "GOLD",
+                {
+                    "ask": 0.0,
+                    "bid": 0.0
+                }
+            )
+        )
+
+    try:
+        # =====================================================
+        # RAILWAY MACD DATA
+        # ЭНД ДАХИН MACD БОДОХГҮЙ
+        # =====================================================
+        macd_data = calculate_macd_arrays(rows)
+
+        macd_line_array = macd_data.get(
+            "macd_line_array",
+            []
+        )
+
+        macd_signal_array = macd_data.get(
+            "macd_signal_array",
+            []
+        )
+
+        macd_histogram_array = macd_data.get(
+            "macd_histogram_array",
+            []
+        )
+
+        # =====================================================
+        # RAILWAY RSI DATA
+        # ЭНД ДАХИН RSI БОДОХГҮЙ
+        # =====================================================
+        rsi_data = calculate_rsi_values(
+            rows,
+            window=7
+        )
+
+        rsi_array = rsi_data.get(
+            "rsi_array",
+            rsi_data.get("rsi", [])
+        )
+
+        # =====================================================
+        # CANDLES
+        # =====================================================
         candles = []
-        for row in rows:
+
+        for i, row in enumerate(rows):
+
+            # Railway дээрх тухайн candle-ийн Ask/Bid биш,
+            # одоогийн market quote-ийг тусад нь өгнө.
+            bid = float(quote.get("bid", 0.0))
+            ask = float(quote.get("ask", 0.0))
+
             candles.append({
                 "open_time": float(row[0]),
                 "open": float(row[1]),
@@ -454,20 +511,63 @@ def get_gold_for_backtest():
                 "low": float(row[3]),
                 "close": float(row[4]),
                 "volume": float(row[5]),
-                "rsi": None,
-                "macd_line": None,
-                "macd_signal": None,
-                "macd_histogram": None,
-                "bid": float(row[4]),
-                "ask": float(row[4]) + 0.30
+
+                # =================================================
+                # RAILWAY INDICATORS
+                # =================================================
+                "rsi": (
+                    float(rsi_array[i])
+                    if i < len(rsi_array)
+                    and rsi_array[i] is not None
+                    else None
+                ),
+
+                "macd_line": (
+                    float(macd_line_array[i])
+                    if i < len(macd_line_array)
+                    and macd_line_array[i] is not None
+                    else None
+                ),
+
+                "macd_signal": (
+                    float(macd_signal_array[i])
+                    if i < len(macd_signal_array)
+                    and macd_signal_array[i] is not None
+                    else None
+                ),
+
+                "macd_histogram": (
+                    float(macd_histogram_array[i])
+                    if i < len(macd_histogram_array)
+                    and macd_histogram_array[i] is not None
+                    else None
+                ),
+
+                # =================================================
+                # REAL MARKET QUOTE FROM MT5 BRIDGE
+                # =================================================
+                "bid": bid,
+                "ask": ask
             })
 
-    return {
-        "symbol": "GOLD",
-        "timeframe": "1m",
-        "count": len(candles),
-        "candles": candles
-    }
+        return {
+            "symbol": "GOLD",
+            "timeframe": "1m",
+            "count": len(candles),
+
+            # Одоогийн бодит quote
+            "bid": float(quote.get("bid", 0.0)),
+            "ask": float(quote.get("ask", 0.0)),
+
+            "candles": candles
+        }
+
+    except Exception as e:
+        print(f"[GOLD API ERROR] {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
     
 @app.get("/price/{symbol}")
 def get_symbol_live_price(symbol: str):
