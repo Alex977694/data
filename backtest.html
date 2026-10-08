@@ -523,11 +523,7 @@ function runBacktest(){
 
  const positions={LONG:[],SHORT:[]},ready={LONG:true,SHORT:true},armed={LONG:false,SHORT:false};
  const trades=[],events=[];
- const mx={
-  lastStatus:mxAll.lastStatus.slice(range.start,range.end),
-  prevMin:mxAll.prevMin.slice(range.start,range.end),
-  prevMax:mxAll.prevMax.slice(range.start,range.end)
- };
+
  const count={LONG:{open:0,close:0,trades:0},SHORT:{open:0,close:0,trades:0}};
 
  const A={
@@ -598,9 +594,6 @@ function runBacktest(){
    lastShortPnl:spl.length?spl[spl.length-1]:null,
    maxLongPnl:lpl.length?Math.max(...lpl):null,
    maxShortPnl:spl.length?Math.max(...spl):null,
-   macdLastStatus:i>0?mx.lastStatus[i-1]:null,
-   macdPrevMin:i>0?mx.prevMin[i-1]:null,
-   macdPrevMax:i>0?mx.prevMax[i-1]:null,
    maxLongReached:lp.length>=Number(maxPositions.LONG),
    maxShortReached:sp.length>=Number(maxPositions.SHORT),
    notMaxLongReached:lp.length<Number(maxPositions.LONG),
