@@ -429,7 +429,7 @@ def backtest.py():
         with open("backtest.py", "r", encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="backtest.py.html файл олдсонгүй!")
+        raise HTTPException(status_code=404, detail="backtest.py файл олдсонгүй!")
 
 @app.get("/price/{symbol}")
 def get_symbol_live_price(symbol: str):
