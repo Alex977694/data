@@ -15,44 +15,39 @@ def _format_time_gmt8(timestamp):
         "%Y-%m-%d %H:%M:%S"
     )
 
-# ==================== RSI VALUES ====================
-def calculate_rsi_values(klines, window=7):
-    """Return the latest four RSI values from kline data."""
+
+def _get_rsi_series(klines, window=7):
+    """Нэгдсэн байдлаар RSI цувааг тооцоолох туслах функц."""
     if not klines:
         raise ValueError("Kline data is empty")
 
     closes = [float(kline[4]) for kline in klines]
-    rsi_series = RSIIndicator(
+    return RSIIndicator(
         close=pd.Series(closes),
         window=int(window),
     ).rsi().dropna()
+
+
+# ==================== RSI VALUES ====================
+def calculate_rsi_values(klines, window=7):
+    """Return the latest four RSI values from kline data."""
+    rsi_series = _get_rsi_series(klines, window)
 
     if len(rsi_series) < 4:
         raise ValueError("At least four RSI values are required")
 
-    rsi0 = float(rsi_series.iloc[-1])
-    rsi1 = float(rsi_series.iloc[-2])
-    rsi2 = float(rsi_series.iloc[-3])
-    rsi3 = float(rsi_series.iloc[-4])
-
     return {
-        "rsi0": rsi0,
-        "rsi1": rsi1,
-        "rsi2": rsi2,
-        "rsi3": rsi3,
+        "rsi0": float(rsi_series.iloc[-1]),
+        "rsi1": float(rsi_series.iloc[-2]),
+        "rsi2": float(rsi_series.iloc[-3]),
+        "rsi3": float(rsi_series.iloc[-4]),
     }
+
 
 # ==================== RSI CROSS ====================
 def calculate_rsi_cross(klines, window=7):
     """Return the latest closed-candle RSI cross states."""
-    if not klines:
-        raise ValueError("Kline data is empty")
-
-    closes = [float(kline[4]) for kline in klines]
-    rsi_series = RSIIndicator(
-        close=pd.Series(closes),
-        window=int(window),
-    ).rsi().dropna()
+    rsi_series = _get_rsi_series(klines, window)
 
     if len(rsi_series) < 4:
         raise ValueError("At least four RSI values are required")
@@ -67,17 +62,11 @@ def calculate_rsi_cross(klines, window=7):
         "70_down": "DOWN" if (rsi2 >= 70 and rsi1 < 70) else "--",
     }
 
+
 # ==================== RSI STATES ====================
 def calculate_rsi_states(klines, window=7):
     """Return cross states and min/max open values for the latest RSI crosses."""
-    if not klines:
-        raise ValueError("Kline data is empty")
-
-    closes = [float(kline[4]) for kline in klines]
-    rsi_series = RSIIndicator(
-        close=pd.Series(closes),
-        window=int(window),
-    ).rsi().dropna()
+    rsi_series = _get_rsi_series(klines, window)
 
     if len(rsi_series) < 5:
         return {"cross_history": {}}
@@ -139,14 +128,11 @@ def calculate_rsi_states(klines, window=7):
 
     return {"cross_history": cross_history}
 
+
 # ==================== RSI LAST STATUS ====================
 def calculate_rsi_laststatus(klines, window=7):
     """Return the latest closed-candle RSI status and its timestamp."""
-    if not klines:
-        raise ValueError("Kline data is empty")
-
-    closes = [float(kline[4]) for kline in klines]
-    rsi_series = RSIIndicator(close=pd.Series(closes), window=int(window)).rsi().dropna()
+    rsi_series = _get_rsi_series(klines, window)
     if len(rsi_series) < 4:
         return {"last_status": "None", "last_status_time": None}
 
@@ -167,14 +153,11 @@ def calculate_rsi_laststatus(klines, window=7):
 
     return {"last_status": "None", "last_status_time": None}
 
+
 # ==================== RSI TREND ====================
 def calculate_rsi_trend(klines, window=7):
     """Return the RSI trend independently from the other RSI calculations."""
-    if not klines:
-        raise ValueError("Kline data is empty")
-
-    closes = [float(kline[4]) for kline in klines]
-    rsi_series = RSIIndicator(close=pd.Series(closes), window=int(window)).rsi().dropna()
+    rsi_series = _get_rsi_series(klines, window)
     if len(rsi_series) < 4:
         return {"trend": "None"}
 
@@ -219,14 +202,11 @@ def calculate_rsi_trend(klines, window=7):
 
     return {"trend": trend}
 
+
 # ==================== RSI AVERAGE ====================
 def calculate_rsi_average(klines, window=7):
     """Return average_status, MAXU, and MIND independently."""
-    if not klines:
-        raise ValueError("Kline data is empty")
-
-    closes = [float(kline[4]) for kline in klines]
-    rsi_series = RSIIndicator(close=pd.Series(closes), window=int(window)).rsi().dropna()
+    rsi_series = _get_rsi_series(klines, window)
     if len(rsi_series) < 4:
         return {"average_status": None}
 
@@ -260,6 +240,18 @@ def calculate_rsi_average(klines, window=7):
         "average_status": (s30u + s70d) / 2.0 if s30u and s70d else None,
     }
 
+# ==================== ALL RSI INDICATORS (WRAPPER) ====================
+def calculate_all_rsi_indicators(klines, window=7):
+    """Бүх RSI индикаторуудыг тухайн window утгаар нэг дор тооцоолж буцаах функц."""
+    return {
+        **calculate_rsi_values(klines, window=window),
+        **calculate_rsi_cross(klines, window=window),
+        **calculate_rsi_states(klines, window=window),
+        **calculate_rsi_laststatus(klines, window=window),
+        **calculate_rsi_trend(klines, window=window),
+        **calculate_rsi_average(klines, window=window),
+    }
+    
 __all__ = [
     "calculate_rsi_values",
     "calculate_rsi_cross",
