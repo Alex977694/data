@@ -2,7 +2,7 @@ import os
 import json
 import threading
 import time
-import datetime  # Эсвэл from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import websocket
 from binance.um_futures import UMFutures
