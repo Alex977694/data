@@ -11,6 +11,9 @@ async function initMarketData() {
         const data = await res.json();
         
         console.log("Raw Railway data:", data);
+        console.log("FIRST CANDLE:", data.candles?.[0]);
+        console.log("SECOND CANDLE:", data.candles?.[1]);
+        console.log("CANDLE LENGTH:", data.candles?.[0]?.length);
 
         if (data.candles) {
             candles = data.candles.map(c => ({
