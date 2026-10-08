@@ -308,3 +308,77 @@ button:disabled:hover{border-color:var(--line2);color:var(--text);background:var
 @media(max-width:900px){
   .condition-row.has-ready,.condition-row.has-ready:first-child{grid-template-columns:1fr 58px 90px 1fr 110px 32px}
 }
+
+
+.chart-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.chart-tools {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.chart-tool {
+    background: #1f2937;
+    border: 1px solid #374151;
+    color: #e5e7eb;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.chart-tool:hover {
+    background: #374151;
+}
+
+.chart-settings {
+    margin: 10px 0;
+    padding: 12px;
+    background: #0f172a;
+    border: 1px solid #374151;
+    border-radius: 8px;
+}
+
+.chart-setting-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+
+.chart-setting-group:last-child {
+    margin-bottom: 0;
+}
+
+.chart-setting-group label {
+    color: #9ca3af;
+    font-size: 11px;
+}
+
+.chart-setting-group input,
+.chart-setting-group select {
+    background: #111827;
+    border: 1px solid #374151;
+    color: #f3f4f6;
+    border-radius: 5px;
+    padding: 5px 7px;
+}
+
+.chart-setting-group input[type="number"] {
+    width: 65px;
+}
+
+.indicator-toggle {
+    color: #facc15 !important;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-right: 8px;
+}
