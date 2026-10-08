@@ -1,16 +1,21 @@
 # ohlc_data.py
 import pandas as pd
 
-# ==================== STATE ====================
-ohlc_states = {}
 
 # ==================== ADVANCED OHLC TRACKER ====================
-def calculate_ohlc_tracker_report(klines, symbol="UNKNOWN"):
-    global ohlc_states
+def calculate_ohlc_tracker_report(klines, symbol="UNKNOWN", state_dict=None):
+    """
+    OHLC tracker-ийг тооцоолох функц.
+    state_dict-ийг гаднаас дамжуулж өгснөөр глобал хувьсагчийн алдаанаас сэргийлнэ.
+    """
+    if state_dict is None:
+        state_dict = {}
+
     try:
         if not klines or len(klines) < 4:
             return {"error": "Not enough kline data for OHLC tracker"}
 
+        # Сүүлийн 4 лааг авах
         last_4 = klines[-4:]
         index_keys = ["-3", "-2", "-1", "0"]
         ohlc_dict = {}
@@ -23,19 +28,19 @@ def calculate_ohlc_tracker_report(klines, symbol="UNKNOWN"):
                 "open": float(kline[1]),
                 "high": float(kline[2]),
                 "low": float(kline[3]),
-                "close": float(kline[4])
+                "close": float(kline[4]),
             }
             ohlc_dict[idx_key] = candle_data
             ohlc_list_for_df.append(candle_data)
 
         df = pd.DataFrame(ohlc_list_for_df)
 
-        min_open = df["open"].min()
-        max_open = df["open"].max()
-        min_close = df["close"].min()
-        max_close = df["close"].max()
-        max_high = df["high"].max()
-        min_low = df["low"].min()
+        min_open = float(df["open"].min())
+        max_open = float(df["open"].max())
+        min_close = float(df["close"].min())
+        max_close = float(df["close"].max())
+        max_high = float(df["high"].max())
+        min_low = float(df["low"].min())
 
         open0 = ohlc_list_for_df[-1]["open"]
         open1 = ohlc_list_for_df[-2]["open"]
@@ -43,15 +48,15 @@ def calculate_ohlc_tracker_report(klines, symbol="UNKNOWN"):
         openup = open0 > open1
         opendown = open0 < open1
 
-        if symbol not in ohlc_states:
-            ohlc_states[symbol] = {
+        if symbol not in state_dict:
+            state_dict[symbol] = {
                 "last_openup_limit": None,
                 "last_opendown_limit": None,
                 "prev_openup": False,
-                "prev_opendown": False
+                "prev_opendown": False,
             }
 
-        st = ohlc_states[symbol]
+        st = state_dict[symbol]
 
         if openup and not st["prev_openup"]:
             st["last_openup_limit"] = min_open
@@ -68,22 +73,18 @@ def calculate_ohlc_tracker_report(klines, symbol="UNKNOWN"):
             "candle_high_0": float(ohlc_dict.get("0", {}).get("high", 0)),
             "candle_low_0": float(ohlc_dict.get("0", {}).get("low", 0)),
             "candle_close_0": float(ohlc_dict.get("0", {}).get("close", 0)),
-
             "candle_open_1": float(ohlc_dict.get("-1", {}).get("open", 0)),
             "candle_high_1": float(ohlc_dict.get("-1", {}).get("high", 0)),
             "candle_low_1": float(ohlc_dict.get("-1", {}).get("low", 0)),
             "candle_close_1": float(ohlc_dict.get("-1", {}).get("close", 0)),
-
             "candle_open_2": float(ohlc_dict.get("-2", {}).get("open", 0)),
             "candle_high_2": float(ohlc_dict.get("-2", {}).get("high", 0)),
             "candle_low_2": float(ohlc_dict.get("-2", {}).get("low", 0)),
             "candle_close_2": float(ohlc_dict.get("-2", {}).get("close", 0)),
-
             "candle_open_3": float(ohlc_dict.get("-3", {}).get("open", 0)),
             "candle_high_3": float(ohlc_dict.get("-3", {}).get("high", 0)),
             "candle_low_3": float(ohlc_dict.get("-3", {}).get("low", 0)),
             "candle_close_3": float(ohlc_dict.get("-3", {}).get("close", 0)),
-            
             "min_open": min_open,
             "max_open": max_open,
             "min_close": min_close,
@@ -93,7 +94,12 @@ def calculate_ohlc_tracker_report(klines, symbol="UNKNOWN"):
             "openup": openup,
             "opendown": opendown,
             "openup_limit": st["last_openup_limit"],
-            "opendown_limit": st["last_opendown_limit"]
+            "opendown_limit": st["last_opendown_limit"],
         }
     except Exception as e:
         return {"error": str(e)}
+
+
+__all__ = [
+    "calculate_ohlc_tracker_report",
+]
