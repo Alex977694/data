@@ -433,9 +433,6 @@ def backtest_page():
             status_code=404,
             detail="backtest.html файл олдсонгүй!"
         )
-Ингээд:
-
-https://web-production-c3082.up.railway.app/backtest
         
 @app.get("/price/{symbol}")
 def get_symbol_live_price(symbol: str):
