@@ -423,18 +423,19 @@ def get_binchart():
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="binchart.html файл олдсонгүй!")
 
-@app.get("/backtest.py", response_class=HTMLResponse)
-def backtest_py():
+@app.get("/backtest", response_class=HTMLResponse)
+def backtest_page():
     try:
-        with open("backtest.py", "r", encoding="utf-8") as f:
-            code_content = f.read()
-        # Хэрэв backtest.py файлыг доторх HTML/UI загвартайгаар нь вэб браузер дээр харуулах бол:
-        return HTMLResponse(content=code_content, status_code=200)
+        with open("backtest.html", "r", encoding="utf-8") as f:
+            return f.read()
     except FileNotFoundError:
         raise HTTPException(
             status_code=404,
-            detail="backtest.py файл олдсонгүй!"
+            detail="backtest.html файл олдсонгүй!"
         )
+Ингээд:
+
+https://web-production-c3082.up.railway.app/backtest
         
 @app.get("/price/{symbol}")
 def get_symbol_live_price(symbol: str):
