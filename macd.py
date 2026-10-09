@@ -99,31 +99,9 @@ def calculate_macd_trend(klines, fast=12, slow=26, signal=9):
 
 # ==================== MACD PEAKS ====================
 def calculate_macd_peaks(klines, fast=12, slow=26, signal=9):
-    """Return the latest positive peak and negative trough prices."""
+    """Return the last completed extrema and the currently forming extremum."""
     macd_line, _, _ = _calculate_macd_series(klines, fast, slow, signal)
     offset = len(klines) - len(macd_line)
-    up_crossings = []
-    down_crossings = []
-
-    for index in range(1, len(macd_line) - 1):
-        previous_2_macd_line = macd_line.iloc[index - 1]
-        previous_macd_line = macd_line.iloc[index]
-        if previous_2_macd_line <= 0 < previous_macd_line:
-            up_crossings.append(index)
-        elif previous_2_macd_line >= 0 > previous_macd_line:
-            down_crossings.append(index)
-
-    def find_peak(start_index, positive):
-        if start_index is None:
-            return {"macd_value": 0.0, "price": 0.0}
-        values = macd_line.iloc[start_index : len(macd_line) - 1]
-        value = max(values) if positive else min(values)
-        index = values.tolist().index(value) + start_index
-        kline_index = index + offset
-        return {
-            "macd_value": float(value),
-            "price": float(klines[kline_index][1]) if 0 <= kline_index < len(klines) else 0.0,
-        }
 
     def point_at(index):
         kline_index = index + offset
@@ -135,40 +113,45 @@ def calculate_macd_peaks(klines, fast=12, slow=26, signal=9):
             "time": _format_time_gmt8(klines[kline_index][0]),
         }
 
-    last_peak = None
-    last_trough = None
+    macd_peak = {"macd_value": 0.0, "price": 0.0}
+    macd_trough = {"macd_value": 0.0, "price": 0.0}
     active_peak = None
     active_trough = None
+    last_peak = None
+    last_trough = None
     closed_length = max(0, len(macd_line) - 1)
 
     for index in range(closed_length):
         value = float(macd_line.iloc[index])
         previous = float(macd_line.iloc[index - 1]) if index else 0.0
+        point = point_at(index)
 
-        if previous > 0 and value < 0:
+        if previous >= 0 and value < 0:
             if active_peak is not None:
-                last_peak = active_peak
+                macd_peak = {key: active_peak[key] for key in ("macd_value", "price")}
             active_peak = None
-            active_trough = point_at(index)
-        elif previous < 0 and value > 0:
+            active_trough = point
+        elif previous <= 0 and value > 0:
             if active_trough is not None:
-                last_trough = active_trough
+                macd_trough = {key: active_trough[key] for key in ("macd_value", "price")}
             active_trough = None
-            active_peak = point_at(index)
+            active_peak = point
         elif value > 0:
-            point = point_at(index)
             if active_peak is None or point["macd_value"] > active_peak["macd_value"]:
                 active_peak = point
         elif value < 0:
-            point = point_at(index)
             if active_trough is None or point["macd_value"] < active_trough["macd_value"]:
                 active_trough = point
 
     latest_closed = float(macd_line.iloc[-2]) if len(macd_line) > 1 else None
+    if latest_closed is not None and latest_closed > 0:
+        last_peak = active_peak
+    elif latest_closed is not None and latest_closed < 0:
+        last_trough = active_trough
 
     return {
-        "macd_peak": find_peak(up_crossings[-1] if up_crossings else None, True) if latest_closed is not None and latest_closed > 0 else None,
-        "macd_trough": find_peak(down_crossings[-1] if down_crossings else None, False) if latest_closed is not None and latest_closed < 0 else None,
+        "macd_peak": macd_peak,
+        "macd_trough": macd_trough,
         "last_peak": last_peak,
         "last_trough": last_trough,
     }
@@ -181,18 +164,12 @@ def calculate_macd_average(klines, fast=12, slow=26, signal=9):
         raise ValueError("At least four MACD values are required")
     values = [float(value) for value in macd_line.iloc[-5:-1]]
     peaks = calculate_macd_peaks(klines, fast, slow, signal)
-    last_peak = peaks["last_peak"]
-    last_trough = peaks["last_trough"]
-    peak_value = last_peak["macd_value"] if last_peak else None
-    trough_value = last_trough["macd_value"] if last_trough else None
+    peak_value = peaks["macd_peak"]["macd_value"]
+    trough_value = peaks["macd_trough"]["macd_value"]
     return {
         "macd_min": f"{min(values):.8f}",
         "macd_max": f"{max(values):.8f}",
-        "macd_average": (
-            f"{(peak_value + trough_value) / 2.0:.8f}"
-            if peak_value is not None and trough_value is not None
-            else None
-        ),
+        "macd_average": f"{(peak_value + trough_value) / 2.0:.8f}",
     }
 
 
