@@ -432,11 +432,13 @@ function limitFor(type, i) {
     return type === "LONG" ? limits.longLimit : limits.shortLimit;
 }
 
-/* ===== BACKTEST RANGE (Засагдсан хувилбар) ===== */
+/* ===== BACKTEST RANGE (Бүрэн засагдсан хувилбар) ===== */
 function getBacktestRange() {
-    const n = candles.length;
+    // Ямар ч үед window.candles эсвэл candles-ийн аль устайг нь авна
+    const currentCandles = getCandles();
+    const n = currentCandles.length;
     
-    // Хэрэв ADD RANGE сонгоогүй эсвэл ямар нэг байдлаар утга олдохгүй бол бүх датаг буцаана
+    // Хэрэв ADD RANGE сонгоогүй бол бүх датаг буцаана
     if (!document.getElementById("addRange") || !document.getElementById("addRange").checked) {
         return { start: 0, end: n, count: n, mode: "ALL" };
     }
@@ -444,7 +446,7 @@ function getBacktestRange() {
     const mode = document.getElementById("rangeMode").value;
     const day = parseInt(document.getElementById("rangeDay").value, 10) || 1;
 
-    // 1 өдөр = 1440 минут (лаа) гэж үзэхэд
+    // 1 өдөр = 1440 минут (1 минут тутамд 1 лаа)
     const candlesPerDay = 1440;
     
     if (mode === "last") {
