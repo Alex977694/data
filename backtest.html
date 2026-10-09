@@ -292,7 +292,10 @@ function sourceValue(c, s) {
     return fin(x) ? x : null;
 }
 
-function applyIndicators() {
+// ==========================================
+// APPLY INDICATORS (Глобал функц болгож зарлав)
+// ==========================================
+window.applyIndicators = function() {
     const rp = parseInt($("rsiPeriod").value.trim(), 10);
     const rs = $("rsiSource").value;
 
@@ -333,10 +336,6 @@ function applyIndicators() {
         return;
     }
 
-    /* ==========================================
-       UPDATE META CHART DIRECTLY
-    ========================================== */
-
     window.allData = candles.map(c => [
         Number(c.open_time),
         Number(c.open),
@@ -360,134 +359,59 @@ function applyIndicators() {
 
     $("dataInfo").textContent =
         `13 columns | ${candles.length} candles | RSI ${rp} ${rs.toUpperCase()} | MACD ${mf}/${ms}/${mg}`;
-}
+};
 
 document.addEventListener("DOMContentLoaded", () => {
-
     const indicatorBtn = document.getElementById("toggleIndicators");
     const settingsBtn = document.getElementById("toggleChartSettings");
     const settings = document.getElementById("chartSettings");
 
-    /*
-     * INDICATORS button
-     * RSI / MACD indicator panel-ийг show/hide хийнэ.
-     */
     if (indicatorBtn) {
-
         indicatorBtn.addEventListener("click", () => {
-
             const rsi = document.getElementById("showRSI");
             const macd = document.getElementById("showMACD");
-
-            if (rsi) {
-                rsi.checked = !rsi.checked;
-            }
-
-            if (macd) {
-                macd.checked = !macd.checked;
-            }
-
+            if (rsi) rsi.checked = !rsi.checked;
+            if (macd) macd.checked = !macd.checked;
             if (typeof window.redrawChart === "function") {
                 window.redrawChart();
             }
-
         });
-
     }
 
-
-    /*
-     * ⚙ button
-     * RSI / MACD settings panel-ийг нээнэ.
-     */
     if (settingsBtn && settings) {
-
         settingsBtn.addEventListener("click", () => {
-
-            const hidden =
-                settings.style.display === "none" ||
-                settings.style.display === "";
-
-            settings.style.display =
-                hidden ? "block" : "none";
-
+            const hidden = settings.style.display === "none" || settings.style.display === "";
+            settings.style.display = hidden ? "block" : "none";
         });
-
     }
 
-
-    /*
-     * APPLY button
-     */
-    const applyBtn =
-        document.getElementById("applyIndicators");
-
+    const applyBtn = document.getElementById("applyIndicators");
     if (applyBtn) {
-
         applyBtn.addEventListener("click", () => {
-
             if (typeof window.applyIndicators === "function") {
                 window.applyIndicators();
             }
-
         });
-
     }
+});
 
-})
-
- /* ==========================================
-    UPDATE META CHART DIRECTLY
- ========================================== */
-
- window.allData=candles.map(c=>[
-   Number(c.open_time),
-   Number(c.open),
-   Number(c.high),
-   Number(c.low),
-   Number(c.close),
-   Number(c.volume)
- ]);
-
- window.rsiArrayData =
-    candles.map(c => fin(Number(c.rsi)) ? Number(c.rsi) : null);
-
-window.macdArrayData =
-    candles.map(c => fin(Number(c.macd_line)) ? Number(c.macd_line) : null);
-
-window.signalArrayData =
-    candles.map(c => fin(Number(c.macd_signal)) ? Number(c.macd_signal) : null);
-
-window.histArrayData =
-    candles.map(c => fin(Number(c.macd_histogram)) ? Number(c.macd_histogram) : null);
-
- if(window.redrawChart){
-   window.redrawChart();
- }
-
- $("indicatorStatus").textContent=
-   `RSI ${rp} / ${rs.toUpperCase()} | MACD ${mf},${ms},${mg}`;
-
- $("dataInfo").textContent=
-   `13 columns | ${candles.length} candles | RSI ${rp} ${rs.toUpperCase()} | MACD ${mf}/${ms}/${mg}`;
+function time(x) {
+    let t = Number(x);
+    if (!fin(t)) return String(x ?? "-");
+    if (t < 1e11) t *= 1000;
+    return new Date(t).toISOString().replace("T", " ").replace(".000Z", "");
 }
 
-function time(x){
- let t=Number(x);
- if(!fin(t))return String(x??"-");
- if(t<1e11)t*=1000;
- return new Date(t).toISOString().replace("T"," ").replace(".000Z","");
-}
-const price=x=>fin(Number(x))?Number(x).toFixed(2):"-";
-function pnl(x){x=Number(x);return fin(x)?(x>0?"+":"")+x.toFixed(2):"-"}
+const price = x => fin(Number(x)) ? Number(x).toFixed(2) : "-";
+function pnl(x) { x = Number(x); return fin(x) ? (x > 0 ? "+" : "") + x.toFixed(2) : "-"; }
 
-function trade(type,et,ep,xt,xp,limit){
- return{type,entryTime:et,entryPrice:ep,exitTime:xt,exitPrice:xp,limit,pnl:type==="LONG"?xp-ep:ep-xp};
+function trade(type, et, ep, xt, xp, limit) {
+    return { type, entryTime: et, entryPrice: ep, exitTime: xt, exitPrice: xp, limit, pnl: type === "LONG" ? xp - ep : ep - xp };
 }
 
-function getOpenLimits(i){
-    const opens = [0,1,2,3]
-        .map(n => val("OPEN"+n, i))
+function getOpenLimits(i) {
+    const opens = [0, 1, 2, 3]
+        .map(n => val("OPEN" + n, i))
         .filter(Number.isFinite);
 
     return {
@@ -496,580 +420,363 @@ function getOpenLimits(i){
     };
 }
 
-function limitFor(type, i){
+function limitFor(type, i) {
     const limits = getOpenLimits(i);
-    return type === "LONG"
-        ? limits.longLimit
-        : limits.shortLimit;
+    return type === "LONG" ? limits.longLimit : limits.shortLimit;
 }
-
 
 /* ===== BACKTEST RANGE ===== */
-
-function getBacktestRange(){
- const n=candles.length,all={start:0,end:n,count:n,mode:"ALL"};
- if(!$("addRange").checked)return all;
- const mode=$("rangeMode").value,day=parseInt($("rangeDay").value,10);
- if(mode==="last"){
-  const start=Math.max(0,n-MINUTES_PER_DAY*day);
-  return{start,end:n,count:n-start,mode:"LAST",days:day};
- }
- if(mode==="block"){
-  const end=n-MINUTES_PER_DAY*(day-1);
-  const start=Math.max(0,end-MINUTES_PER_DAY);
-  const e=Math.max(0,Math.min(n,end));
-  return{start,end:e,count:Math.max(0,e-start),mode:"DAY",days:day};
- }
- return all;
+function getBacktestRange() {
+    const n = candles.length, all = { start: 0, end: n, count: n, mode: "ALL" };
+    if (!$("addRange").checked) return all;
+    const mode = $("rangeMode").value, day = parseInt($("rangeDay").value, 10);
+    if (mode === "last") {
+        const start = Math.max(0, n - MINUTES_PER_DAY * day);
+        return { start, end: n, count: n - start, mode: "LAST", days: day };
+    }
+    if (mode === "block") {
+        const end = n - MINUTES_PER_DAY * (day - 1);
+        const start = Math.max(0, end - MINUTES_PER_DAY);
+        const e = Math.max(0, Math.min(n, end));
+        return { start, end: e, count: Math.max(0, e - start), mode: "DAY", days: day };
+    }
+    return all;
 }
 
-function updateRangeUI(){
- const on=$("addRange").checked,mode=$("rangeMode").value;
- ["rangeMode","rangeDay","rangePreview"].forEach(id=>$(id).style.display=on?"inline-block":"none");
- if(!on){$("rangePreview").textContent="ALL LOADED CANDLES";return}
- const day=parseInt($("rangeDay").value,10);
- $("rangePreview").textContent=mode==="last"
-  ?`LAST ${day} DAY${day>1?"S":""} — ${Math.min(candles.length,MINUTES_PER_DAY*day)} CANDLES`
-  :`DAY ${day} — ${getBacktestRange().count} CANDLES`;
+function updateRangeUI() {
+    const on = $("addRange").checked, mode = $("rangeMode").value;
+    ["rangeMode", "rangeDay", "rangePreview"].forEach(id => $(id).style.display = on ? "inline-block" : "none");
+    if (!on) { $("rangePreview").textContent = "ALL LOADED CANDLES"; return; }
+    const day = parseInt($("rangeDay").value, 10);
+    $("rangePreview").textContent = mode === "last"
+        ? `LAST ${day} DAY${day > 1 ? "S" : ""} — ${Math.min(candles.length, MINUTES_PER_DAY * day)} CANDLES`
+        : `DAY ${day} — ${getBacktestRange().count} CANDLES`;
 }
 
 /* ===== BACKTEST ===== */
+function runBacktest() {
+    const range = getBacktestRange();
+    const activeCandles = candles.slice(range.start, range.end);
+    if (!activeCandles.length) return alert("Selected range has no candles.");
 
-function runBacktest(){
- const range=getBacktestRange();
- const activeCandles=candles.slice(range.start,range.end);
- if(!activeCandles.length)return alert("Selected range has no candles.");
+    if (!groups.longOpen.length && !groups.shortOpen.length)
+        return alert("Add at least one LONG OPEN or SHORT OPEN condition.");
+    for (const t of ["LONG", "SHORT"])
+        if (positionMode[t] === "MANY" && !groups[t.toLowerCase() + "Reset"].length)
+            return alert(`${t} MANY POS requires ${t} RESET CONDITION.`);
+    for (const t of ["LONG", "SHORT"]) {
+        const k = t.toLowerCase();
+        if (groups[k + "Open"].length && !groups[k + "Exit"].length)
+            return alert(`${t} OPEN exists, but ${t} EXIT is empty.`);
+    }
 
- if(!groups.longOpen.length&&!groups.shortOpen.length)
-  return alert("Add at least one LONG OPEN or SHORT OPEN condition.");
- for(const t of["LONG","SHORT"])
-  if(positionMode[t]==="MANY"&&!groups[t.toLowerCase()+"Reset"].length)
-   return alert(`${t} MANY POS requires ${t} RESET CONDITION.`);
- for(const t of["LONG","SHORT"]){
-  const k=t.toLowerCase();
-  if(groups[k+"Open"].length&&!groups[k+"Exit"].length)
-   return alert(`${t} OPEN exists, but ${t} EXIT is empty.`);
- }
+    const positions = { LONG: [], SHORT: [] }, ready = { LONG: true, SHORT: true }, armed = { LONG: false, SHORT: false };
+    const trades = [], events = [];
+    const count = { LONG: { open: 0, close: 0, trades: 0 }, SHORT: { open: 0, close: 0, trades: 0 } };
 
- const positions={LONG:[],SHORT:[]},ready={LONG:true,SHORT:true},armed={LONG:false,SHORT:false};
- const trades=[],events=[];
-
- const count={LONG:{open:0,close:0,trades:0},SHORT:{open:0,close:0,trades:0}};
-
- const A={
-  bal:Number($("accBalance").value)||1000,
-  lev:Number($("accLeverage").value)||100,
-  lot:Number($("accLot").value)||0.01,
-  cs:Number($("accContract").value)||100,
-  so:Number($("accStopOut").value)||50,
-  hedged:$("accHedged").checked
- };
- A.k=A.lot*A.cs;                    // 1 USD үнийн зөрүү = A.k $
- const acc={closed:0,peak:A.bal,maxDD:0,minEq:A.bal,minFloat:0,maxPos:0,
-  minML:null,need:0,soIndex:null,soTime:null,ddBars:0,bars:0,lastEq:A.bal};
-
- function openPosition(type,c,i){
-  const ep=Number(type==="LONG"?c.ask:c.bid);
-  const et=time(c.open_time);
-  const limit=limitFor(type,i);
-
-  positions[type].push({
-    id:Date.now()+Math.random(),
-    type,
-    entryTime:et,
-    entryPrice:ep,
-    limit,
-    peak:0
-  });
-
-  events.push({
-    time:et,
-    price:ep,
-    limit,
-    action:type+" OPEN"
-  });
-
-  count[type].open++;
-  count[type].trades++;
-  ready[type]=false;
- }
-
- function closePosition(type,index,c){
-  const p=positions[type][index];
-  if(!p)return;
-  const xp=Number(type==="LONG"?c.bid:c.ask),xt=time(c.open_time);
-  events.push({time:xt,price:xp,limit:p.limit,action:type+" CLOSE"});
-  trades.push(trade(type,p.entryTime,p.entryPrice,xt,xp,p.limit));
-  acc.closed+=trades[trades.length-1].pnl*A.k;
-  count[type].close++;
-  positions[type].splice(index,1);
- }
-
- const specs=["LONG","SHORT"].map(type=>{
-  const k=type.toLowerCase();
-  return{type,open:groups[k+"Open"],reset:groups[k+"Reset"],rc:groups[k+"ReadyClose"],exit:groups[k+"Exit"]};
- });
-
- activeCandles.forEach((c,i)=>{
-  const lp=positions.LONG,sp=positions.SHORT;
-  const bid=Number(c.bid),ask=Number(c.ask);
-  const lpl=lp.map(p=>bid-Number(p.entryPrice));
-  const spl=sp.map(p=>Number(p.entryPrice)-ask);
-  const longPnl=sum(lpl),shortPnl=sum(spl);
-
-  const dyn={
-   longCount:lp.length,shortCount:sp.length,
-   longPnl,shortPnl,totalFloatingPnl:longPnl+shortPnl,
-   lastLongPnl:lpl.length?lpl[lpl.length-1]:null,
-   lastShortPnl:spl.length?spl[spl.length-1]:null,
-   maxLongPnl:lpl.length?Math.max(...lpl):null,
-   maxShortPnl:spl.length?Math.max(...spl):null,
-   maxLongReached:lp.length>=Number(maxPositions.LONG),
-   maxShortReached:sp.length>=Number(maxPositions.SHORT),
-   notMaxLongReached:lp.length<Number(maxPositions.LONG),
-   notMaxShortReached:sp.length<Number(maxPositions.SHORT)
-  };
-
-  /* RESET */
-specs.forEach(s=>{
-  if(
-    positionMode[s.type]==="MANY" &&
-    s.reset.length &&
-    evalGroup(s.reset,i,{})===true
-  ){
-    ready[s.type]=true;
-  }
-});
-
-/* READY CLOSE: arm хийх / арилгах */
-specs.forEach(s=>{
-  if(!s.rc.length)return;
-
-  const list=positions[s.type];
-
-  if(!list.length){
-    armed[s.type]=false;
-    return;
-  }
-
-  if(armed[s.type])return;
-
-  const last=list[list.length-1];
-
-  const ctx={
-    ...dyn,
-    longLimit:s.type==="LONG"?last.limit:null,
-    shortLimit:s.type==="SHORT"?last.limit:null
-  };
-
-  if(evalGroup(s.rc,i,ctx)===true){
-    armed[s.type]=true;
-  }
-});
-
-/* EXIT */
-specs.forEach(s=>{
-  for(let k=positions[s.type].length-1;k>=0;k--){
-
-    const p=positions[s.type][k];
-
-    const pnlNow=
-      s.type==="LONG"
-        ? bid-p.entryPrice
-        : p.entryPrice-ask;
-
-    p.peak=Math.max(p.peak,pnlNow);
-
-    const ctx={
-      ...dyn,
-      armed:armed[s.type],
-      longLimit:s.type==="LONG"?p.limit:null,
-      shortLimit:s.type==="SHORT"?p.limit:null
+    const A = {
+        bal: Number($("accBalance").value) || 1000,
+        lev: Number($("accLeverage").value) || 100,
+        lot: Number($("accLot").value) || 0.01,
+        cs: Number($("accContract").value) || 100,
+        so: Number($("accStopOut").value) || 50,
+        hedged: $("accHedged").checked
+    };
+    A.k = A.lot * A.cs;
+    const acc = {
+        closed: 0, peak: A.bal, maxDD: 0, minEq: A.bal, minFloat: 0, maxPos: 0,
+        minML: null, need: 0, soIndex: null, soTime: null, ddBars: 0, bars: 0, lastEq: A.bal
     };
 
-    if(evalGroup(s.exit,i,ctx)===true){
-      closePosition(s.type,k,c);
+    function openPosition(type, c, i) {
+        const ep = Number(type === "LONG" ? c.ask : c.bid);
+        const et = time(c.open_time);
+        const limit = limitFor(type, i);
+
+        positions[type].push({ id: Date.now() + Math.random(), type, entryTime: et, entryPrice: ep, limit, peak: 0 });
+        events.push({ time: et, price: ep, limit, action: type + " OPEN" });
+        count[type].open++;
+        count[type].trades++;
+        ready[type] = false;
     }
-  }
 
-  if(!positions[s.type].length){
-    armed[s.type]=false;
-  }
-});
+    function closePosition(type, index, c) {
+        const p = positions[type][index];
+        if (!p) return;
+        const xp = Number(type === "LONG" ? c.bid : c.ask), xt = time(c.open_time);
+        events.push({ time: xt, price: xp, limit: p.limit, action: type + " CLOSE" });
+        trades.push(trade(type, p.entryTime, p.entryPrice, xt, xp, p.limit));
+        acc.closed += trades[trades.length - 1].pnl * A.k;
+        count[type].close++;
+        positions[type].splice(index, 1);
+    }
 
-/* OPEN */
-specs.forEach(s=>{
-   const t=s.type,mode=positionMode[t];
-   if(mode==="SINGLE"){if(positions[t].length>0)return}
-   else if(mode==="MANY"){
-    if(!ready[t]||positions[t].length>=Number(maxPositions[t]))return;
-   }else return;
-   const limits = getOpenLimits(i);
+    const specs = ["LONG", "SHORT"].map(type => {
+        const k = type.toLowerCase();
+        return { type, open: groups[k + "Open"], reset: groups[k + "Reset"], rc: groups[k + "ReadyClose"], exit: groups[k + "Exit"] };
+    });
 
-   const ctx = {
-    ...dyn,
-       longCount: positions.LONG.length,
-       shortCount: positions.SHORT.length,
-       longLimit: limits.longLimit,
-       shortLimit: limits.shortLimit
-   };
+    activeCandles.forEach((c, i) => {
+        const lp = positions.LONG, sp = positions.SHORT;
+        const bid = Number(c.bid), ask = Number(c.ask);
+        const lpl = lp.map(p => bid - Number(p.entryPrice));
+        const spl = sp.map(p => Number(p.entryPrice) - ask);
+        const longPnl = sum(lpl), shortPnl = sum(spl);
 
-   if(evalGroup(s.open,i,ctx)===true){
-       openPosition(t,c,i);
-   }
-  });
+        const dyn = {
+            longCount: lp.length, shortCount: sp.length,
+            longPnl, shortPnl, totalFloatingPnl: longPnl + shortPnl,
+            lastLongPnl: lpl.length ? lpl[lpl.length - 1] : null,
+            lastShortPnl: spl.length ? spl[spl.length - 1] : null,
+            maxLongPnl: lpl.length ? Math.max(...lpl) : null,
+            maxShortPnl: spl.length ? Math.max(...spl) : null,
+            maxLongReached: lp.length >= Number(maxPositions.LONG),
+            maxShortReached: sp.length >= Number(maxPositions.SHORT),
+            notMaxLongReached: lp.length < Number(maxPositions.LONG),
+            notMaxShortReached: sp.length < Number(maxPositions.SHORT)
+        };
 
-/* ACCOUNT */
-   {
-      const bd = Number(c.bid);
-      const ak = Number(c.ask);
+        specs.forEach(s => {
+            if (positionMode[s.type] === "MANY" && s.reset.length && evalGroup(s.reset, i, {}) === true) {
+                ready[s.type] = true;
+            }
+        });
 
-      const fl =
-        (
-          sum(positions.LONG.map(p => bd - p.entryPrice)) +
-          sum(positions.SHORT.map(p => p.entryPrice - ak))
-        ) * A.k;
+        specs.forEach(s => {
+            if (!s.rc.length) return;
+            const list = positions[s.type];
+            if (!list.length) { armed[s.type] = false; return; }
+            if (armed[s.type]) return;
+            const last = list[list.length - 1];
+            const ctx = { ...dyn, longLimit: s.type === "LONG" ? last.limit : null, shortLimit: s.type === "SHORT" ? last.limit : null };
+            if (evalGroup(s.rc, i, ctx) === true) { armed[s.type] = true; }
+        });
 
-      const nl = positions.LONG.length;
-      const ns = positions.SHORT.length;
+        specs.forEach(s => {
+            for (let k = positions[s.type].length - 1; k >= 0; k--) {
+                const p = positions[s.type][k];
+                const pnlNow = s.type === "LONG" ? bid - p.entryPrice : p.entryPrice - ask;
+                p.peak = Math.max(p.peak, pnlNow);
+                const ctx = { ...dyn, armed: armed[s.type], longLimit: s.type === "LONG" ? p.limit : null, shortLimit: s.type === "SHORT" ? p.limit : null };
+                if (evalGroup(s.exit, i, ctx) === true) { closePosition(s.type, k, c); }
+            }
+            if (!positions[s.type].length) { armed[s.type] = false; }
+        });
 
-      const lots = A.hedged
-        ? Math.max(nl, ns)
-        : nl + ns;
+        specs.forEach(s => {
+            const t = s.type, mode = positionMode[t];
+            if (mode === "SINGLE") { if (positions[t].length > 0) return; }
+            else if (mode === "MANY") {
+                if (!ready[t] || positions[t].length >= Number(maxPositions[t])) return;
+            } else return;
+            const limits = getOpenLimits(i);
+            const ctx = { ...dyn, longCount: positions.LONG.length, shortCount: positions.SHORT.length, longLimit: limits.longLimit, shortLimit: limits.shortLimit };
+            if (evalGroup(s.open, i, ctx) === true) { openPosition(t, c, i); }
+        });
 
-      const margin = lots * A.k * bd / A.lev;
-      const eq = A.bal + acc.closed + fl;
+        {
+            const bd = Number(c.bid);
+            const ak = Number(c.ask);
+            const fl = (sum(positions.LONG.map(p => bd - p.entryPrice)) + sum(positions.SHORT.map(p => p.entryPrice - ak))) * A.k;
+            const nl = positions.LONG.length;
+            const ns = positions.SHORT.length;
+            const lots = A.hedged ? Math.max(nl, ns) : nl + ns;
+            const margin = lots * A.k * bd / A.lev;
+            const eq = A.bal + acc.closed + fl;
 
-      acc.bars++;
-      acc.lastEq = eq;
-      acc.peak = Math.max(acc.peak, eq);
-      acc.maxDD = Math.min(acc.maxDD, eq - acc.peak);
+            acc.bars++;
+            acc.lastEq = eq;
+            acc.peak = Math.max(acc.peak, eq);
+            acc.maxDD = Math.min(acc.maxDD, eq - acc.peak);
+            if (eq < acc.peak) { acc.ddBars++; }
+            acc.minEq = Math.min(acc.minEq, eq);
+            acc.minFloat = Math.min(acc.minFloat, fl);
+            acc.maxPos = Math.max(acc.maxPos, nl + ns);
 
-      if(eq < acc.peak){
-         acc.ddBars++;
-      }
+            if (margin > 0) {
+                const ml = eq / margin * 100;
+                if (acc.minML === null || ml < acc.minML) { acc.minML = ml; }
+                acc.need = Math.max(acc.need, A.so / 100 * margin - acc.closed - fl);
+                if (acc.soIndex === null && ml <= A.so) {
+                    acc.soIndex = i;
+                    acc.soTime = time(c.open_time);
+                }
+            }
+        }
+    });
 
-      acc.minEq = Math.min(acc.minEq, eq);
-      acc.minFloat = Math.min(acc.minFloat, fl);
-      acc.maxPos = Math.max(acc.maxPos, nl + ns);
-
-      if(margin > 0){
-         const ml = eq / margin * 100;
-
-         if(acc.minML === null || ml < acc.minML){
-            acc.minML = ml;
-         }
-
-         acc.need = Math.max(
-            acc.need,
-            A.so / 100 * margin - acc.closed - fl
-         );
-
-         if(acc.soIndex === null && ml <= A.so){
-            acc.soIndex = i;
-            acc.soTime = time(c.open_time);
-         }
-      }
-   }
- });
-
-/* =====================================================
-     FINAL STATS
-  ===================================================== */
-
-  const s = stats(
-    trades,
-    positions,
-    events.length,
-    activeCandles
-  );
-
-  s.acc = acc;
-  s.A = A;
-
-  render(
-    count,
-    trades,
-    events,
-    s
-  );
+    const s = stats(trades, positions, events.length, activeCandles);
+    s.acc = acc;
+    s.A = A;
+    render(count, trades, events, s);
 }
 
-/* =========================================================
-   STATS
-========================================================= */
+function stats(trades, pos, totalEvents, activeCandles) {
+    const p = trades.map(x => Number(x.pnl));
+    const wins = p.filter(x => x > 0);
+    const losses = p.filter(x => x < 0);
+    const net = sum(p);
+    const gp = sum(wins);
+    const gl = sum(losses);
 
-function stats(trades, pos, totalEvents, activeCandles){
+    let bal = 0, peak = 0, dd = 0;
+    trades.forEach(t => {
+        bal += t.pnl;
+        peak = Math.max(peak, bal);
+        dd = Math.min(dd, bal - peak);
+    });
 
-   const p = trades.map(x => Number(x.pnl));
+    const data = activeCandles.length ? activeCandles : candles;
+    const last = data.length ? data[data.length - 1] : null;
+    const openPositions = [];
 
-   const wins = p.filter(x => x > 0);
-   const losses = p.filter(x => x < 0);
-
-   const net = sum(p);
-   const gp = sum(wins);
-   const gl = sum(losses);
-
-   let bal = 0;
-   let peak = 0;
-   let dd = 0;
-
-   trades.forEach(t => {
-      bal += t.pnl;
-      peak = Math.max(peak, bal);
-      dd = Math.min(dd, bal - peak);
-   });
-
-   const data =
-      activeCandles.length
-         ? activeCandles
-         : candles;
-
-   const last =
-      data.length
-         ? data[data.length - 1]
-         : null;
-
-   const openPositions = [];
-
-   if(last){
-
-      ["LONG", "SHORT"].forEach(type => {
-
-         pos[type].forEach(q => {
-
-            const cp = Number(
-               type === "LONG"
-                  ? last.bid
-                  : last.ask
-            );
-
-            if(!fin(cp)) return;
-
-            openPositions.push({
-               type,
-               entryTime: q.entryTime,
-               entryPrice: q.entryPrice,
-               limit: q.limit,
-               currentPrice: cp,
-
-               pnl:
-                  type === "LONG"
-                     ? cp - q.entryPrice
-                     : q.entryPrice - cp
+    if (last) {
+        ["LONG", "SHORT"].forEach(type => {
+            pos[type].forEach(q => {
+                const cp = Number(type === "LONG" ? last.bid : last.ask);
+                if (!fin(cp)) return;
+                openPositions.push({
+                    type, entryTime: q.entryTime, entryPrice: q.entryPrice, limit: q.limit, currentPrice: cp,
+                    pnl: type === "LONG" ? cp - q.entryPrice : q.entryPrice - cp
+                });
             });
+        });
+    }
 
-         });
-
-      });
-
-   }
-
-   return {
-
-      netPnl: net,
-
-      grossProfit: gp,
-
-      grossLoss: gl,
-
-      wins: wins.length,
-
-      losses: losses.length,
-
-      winRate:
-         p.length
-            ? wins.length / p.length * 100
-            : 0,
-
-      profitFactor:
-         gl < 0
-            ? gp / Math.abs(gl)
-            : gp > 0
-               ? Infinity
-               : 0,
-
-      averageWin:
-         wins.length
-            ? gp / wins.length
-            : 0,
-
-      averageLoss:
-         losses.length
-            ? gl / losses.length
-            : 0,
-
-      largestWin:
-         wins.length
-            ? Math.max(...wins)
-            : 0,
-
-      largestLoss:
-         losses.length
-            ? Math.min(...losses)
-            : 0,
-
-      maxDrawdown: dd,
-
-      finalBalance: bal,
-
-      openLong: pos.LONG.length,
-
-      openShort: pos.SHORT.length,
-
-      totalEvents,
-
-      openPositions
-
-   };
+    return {
+        netPnl: net, grossProfit: gp, grossLoss: gl, wins: wins.length, losses: losses.length,
+        winRate: p.length ? wins.length / p.length * 100 : 0,
+        profitFactor: gl < 0 ? gp / Math.abs(gl) : (gp > 0 ? Infinity : 0),
+        averageWin: wins.length ? gp / wins.length : 0,
+        averageLoss: losses.length ? gl / losses.length : 0,
+        largestWin: wins.length ? Math.max(...wins) : 0,
+        largestLoss: losses.length ? Math.min(...losses) : 0,
+        maxDrawdown: dd, finalBalance: bal, openLong: pos.LONG.length, openShort: pos.SHORT.length,
+        totalEvents, openPositions
+    };
 }
 
-/* ===== RENDER ===== */
+const cardsHTML = a => a.map(([l, v]) => `<div class="card"><div class="label">${l}</div><div class="value">${v}</div></div>`).join("");
+const emptyHTML = t => `<div style="padding:15px;color:#9ca3af">${t}</div>`;
+const headHTML = a => `<div class="completed header">${a.map(x => `<div>${x}</div>`).join("")}</div>`;
+const pClass = v => v >= 0 ? "pnlp" : "pnln";
+const totalHTML = (n, label, v) => `<div class="completed total-row"><div style="color:#facc15;font-weight:bold">TOTAL</div><div>-</div><div>-</div><div>-</div><div style="color:#9ca3af">${n} ${label}</div><div class="${pClass(v)}">${pnl(v)}</div></div>`;
 
-const cardsHTML=a=>a.map(([l,v])=>`<div class="card"><div class="label">${l}</div><div class="value">${v}</div></div>`).join("");
-const emptyHTML=t=>`<div style="padding:15px;color:#9ca3af">${t}</div>`;
-const headHTML=a=>`<div class="completed header">${a.map(x=>`<div>${x}</div>`).join("")}</div>`;
-const pClass=v=>v>=0?"pnlp":"pnln";
-const totalHTML=(n,label,v)=>`<div class="completed total-row"><div style="color:#facc15;font-weight:bold">TOTAL</div><div>-</div><div>-</div><div>-</div><div style="color:#9ca3af">${n} ${label}</div><div class="${pClass(v)}">${pnl(v)}</div></div>`;
+function render(count, trades, events, s) {
+    window.backtestEvents = events || [];
+    window.backtestTrades = trades || [];
 
-function render(count,trades,events,s){
- window.backtestEvents=events||[];
- window.backtestTrades=trades||[];
+    $("results").innerHTML = cardsHTML([
+        ["COMPLETED TRADES", trades.length],
+        ["LONG TRADES", count.LONG.trades], ["SHORT TRADES", count.SHORT.trades],
+        ["LONG OPEN", count.LONG.open], ["LONG CLOSE", count.LONG.close],
+        ["SHORT OPEN", count.SHORT.open], ["SHORT CLOSE", count.SHORT.close],
+        ["TOTAL EVENTS", s.totalEvents]
+    ]);
 
- $("results").innerHTML=cardsHTML([
-  ["COMPLETED TRADES",trades.length],
-  ["LONG TRADES",count.LONG.trades],["SHORT TRADES",count.SHORT.trades],
-  ["LONG OPEN",count.LONG.open],["LONG CLOSE",count.LONG.close],
-  ["SHORT OPEN",count.SHORT.open],["SHORT CLOSE",count.SHORT.close],
-  ["TOTAL EVENTS",s.totalEvents]
- ]);
+    const money = ["netPnl", "grossProfit", "grossLoss", "averageWin", "averageLoss", "largestWin", "largestLoss", "maxDrawdown", "finalBalance"];
+    $("stats").innerHTML = cardsHTML([
+        ["NET P/L", "netPnl"], ["GROSS PROFIT", "grossProfit"], ["GROSS LOSS", "grossLoss"],
+        ["WINNING TRADES", "wins"], ["LOSING TRADES", "losses"], ["WIN RATE", "winRate"],
+        ["PROFIT FACTOR", "profitFactor"], ["AVERAGE WIN", "averageWin"], ["AVERAGE LOSS", "averageLoss"],
+        ["LARGEST WIN", "largestWin"], ["LARGEST LOSS", "largestLoss"], ["MAX DRAWDOWN", "maxDrawdown"],
+        ["FINAL BALANCE", "finalBalance"], ["OPEN LONG", "openLong"], ["OPEN SHORT", "openShort"],
+        ["TOTAL EVENTS", "totalEvents"]
+    ].map(([label, key]) => {
+        let v = s[key];
+        if (key === "winRate") v = v.toFixed(2) + "%";
+        else if (key === "profitFactor") v = fin(v) ? v.toFixed(2) : "∞";
+        else if (money.includes(key)) v = pnl(v);
+        return [label, v];
+    }));
 
- const money=["netPnl","grossProfit","grossLoss","averageWin","averageLoss","largestWin","largestLoss","maxDrawdown","finalBalance"];
- $("stats").innerHTML=cardsHTML([
-  ["NET P/L","netPnl"],["GROSS PROFIT","grossProfit"],["GROSS LOSS","grossLoss"],
-  ["WINNING TRADES","wins"],["LOSING TRADES","losses"],["WIN RATE","winRate"],
-  ["PROFIT FACTOR","profitFactor"],["AVERAGE WIN","averageWin"],["AVERAGE LOSS","averageLoss"],
-  ["LARGEST WIN","largestWin"],["LARGEST LOSS","largestLoss"],["MAX DRAWDOWN","maxDrawdown"],
-  ["FINAL BALANCE","finalBalance"],["OPEN LONG","openLong"],["OPEN SHORT","openShort"],
-  ["TOTAL EVENTS","totalEvents"]
- ].map(([label,key])=>{
-  let v=s[key];
-  if(key==="winRate")v=v.toFixed(2)+"%";
-  else if(key==="profitFactor")v=fin(v)?v.toFixed(2):"∞";
-  else if(money.includes(key))v=pnl(v);
-  return[label,v];
- }));
+    $("tradeLog").innerHTML =
+        `<div class="trade header"><div>TIME (MT5)</div><div>PRICE</div><div>LIMIT</div><div>ACTION</div></div>` +
+        (events.length ? events.map(e => `<div class="trade"><div class="time">${e.time}</div><div class="price">${price(e.price)}</div><div class="price">${price(e.limit)}</div><div class="${e.action.startsWith("LONG") ? "green" : "red"}">${e.action}</div></div>`).join("") : emptyHTML("No trade events"));
 
- $("tradeLog").innerHTML=
-  `<div class="trade header"><div>TIME (MT5)</div><div>PRICE</div><div>LIMIT</div><div>ACTION</div></div>`+
-  (events.length?events.map(e=>`<div class="trade"><div class="time">${e.time}</div><div class="price">${price(e.price)}</div><div class="price">${price(e.limit)}</div><div class="${e.action.startsWith("LONG")?"green":"red"}">${e.action}</div></div>`).join(""):emptyHTML("No trade events"));
+    const op = s.openPositions, openTotal = sum(op.map(t => Number(t.pnl || 0)));
+    $("openedLog").innerHTML =
+        headHTML(["TYPE", "ENTRY TIME", "ENTRY PRICE", "LIMIT", "CURRENT PRICE", "FLOATING P/L"]) +
+        (op.length ? op.map(t => `<div class="completed"><div>${t.type}</div><div class="time">${t.entryTime}</div><div>${price(t.entryPrice)}</div><div>${price(t.limit)}</div><div>${price(t.currentPrice)}</div><div class="${pClass(t.pnl)}">${pnl(t.pnl)}</div></div>`).join("") : emptyHTML("No opened positions")) +
+        (op.length ? totalHTML(op.length, "POSITIONS", openTotal) : "");
 
- const op=s.openPositions,openTotal=sum(op.map(t=>Number(t.pnl||0)));
- $("openedLog").innerHTML=
-  headHTML(["TYPE","ENTRY TIME","ENTRY PRICE","LIMIT","CURRENT PRICE","FLOATING P/L"])+
-  (op.length?op.map(t=>`<div class="completed"><div>${t.type}</div><div class="time">${t.entryTime}</div><div>${price(t.entryPrice)}</div><div>${price(t.limit)}</div><div>${price(t.currentPrice)}</div><div class="${pClass(t.pnl)}">${pnl(t.pnl)}</div></div>`).join(""):emptyHTML("No opened positions"))+
-  (op.length?totalHTML(op.length,"POSITIONS",openTotal):"");
+    const doneTotal = sum(trades.map(t => Number(t.pnl || 0)));
+    $("completedLog").innerHTML =
+        headHTML(["TYPE", "ENTRY TIME", "ENTRY PRICE", "EXIT TIME", "EXIT PRICE", "P/L"]) +
+        (trades.length ? trades.map(t => `<div class="completed"><div>${t.type}</div><div class="time">${t.entryTime}</div><div>${price(t.entryPrice)}</div><div class="time">${t.exitTime}</div><div>${price(t.exitPrice)}</div><div class="${pClass(t.pnl)}">${pnl(t.pnl)}</div></div>`).join("") : emptyHTML("No completed trades")) +
+        (trades.length ? totalHTML(trades.length, "TRADES", doneTotal) : "");
 
- const doneTotal=sum(trades.map(t=>Number(t.pnl||0)));
- $("completedLog").innerHTML=
-  headHTML(["TYPE","ENTRY TIME","ENTRY PRICE","EXIT TIME","EXIT PRICE","P/L"])+
-  (trades.length?trades.map(t=>`<div class="completed"><div>${t.type}</div><div class="time">${t.entryTime}</div><div>${price(t.entryPrice)}</div><div class="time">${t.exitTime}</div><div>${price(t.exitPrice)}</div><div class="${pClass(t.pnl)}">${pnl(t.pnl)}</div></div>`).join(""):emptyHTML("No completed trades"))+
-  (trades.length?totalHTML(trades.length,"TRADES",doneTotal):"");
-
- const a=s.acc,A=s.A,$$=v=>(v>=0?"+":"")+v.toFixed(2);
- $("accStats").innerHTML=cardsHTML([
-  ["START BALANCE","$"+A.bal.toFixed(2)],
-  ["FINAL EQUITY","$"+a.lastEq.toFixed(2)],
-  ["CLOSED P/L $",$$(a.closed)],
-  ["MAX DRAWDOWN (EQUITY) $",$$(a.maxDD)],
-  ["MAX DD % OF BALANCE",(a.maxDD/A.bal*100).toFixed(2)+"%"],
-  ["MIN EQUITY","$"+a.minEq.toFixed(2)],
-  ["MAX FLOATING LOSS $",$$(a.minFloat)],
-  ["MAX OPEN POSITIONS",a.maxPos],
-  ["MIN MARGIN LEVEL",a.minML===null?"-":a.minML.toFixed(0)+"%"],
-  ["MIN ACCOUNT NEEDED","$"+Math.max(0,a.need).toFixed(2)],
-  ["TIME IN DRAWDOWN",(a.bars?a.ddBars/a.bars*100:0).toFixed(0)+"%"],
-  ["STOP-OUT",a.soIndex===null?"NO":"YES"]
- ]);
-  $("accNote").textContent=a.soIndex===null
-  ?`✅ Stop-out (${A.so}%) болоогүй. LOT ${A.lot}, 1:${A.lev}.`
-  :`❌ ACCOUNT BLOWN: ${a.soTime} (свеч #${a.soIndex}) үед margin level ${A.so}%-иас доош орсон. Хамгийн багадаа $${Math.max(0,a.need).toFixed(2)} данс хэрэгтэй байсан.`;
+    const a = s.acc, A = s.A, $$ = v => (v >= 0 ? "+" : "") + v.toFixed(2);
+    $("accStats").innerHTML = cardsHTML([
+        ["START BALANCE", "$" + A.bal.toFixed(2)],
+        ["FINAL EQUITY", "$" + a.lastEq.toFixed(2)],
+        ["CLOSED P/L $", $$(a.closed)],
+        ["MAX DRAWDOWN (EQUITY) $", $$(a.maxDD)],
+        ["MAX DD % OF BALANCE", (a.maxDD / A.bal * 100).toFixed(2) + "%"],
+        ["MIN EQUITY", "$" + a.minEq.toFixed(2)],
+        ["MAX FLOATING LOSS $", $$(a.minFloat)],
+        ["MAX OPEN POSITIONS", a.maxPos],
+        ["MIN MARGIN LEVEL", a.minML === null ? "-" : a.minML.toFixed(0) + "%"],
+        ["MIN ACCOUNT NEEDED", "$" + Math.max(0, a.need).toFixed(2)],
+        ["TIME IN DRAWDOWN", (a.bars ? a.ddBars / a.bars * 100 : 0).toFixed(0) + "%"],
+        ["STOP-OUT", a.soIndex === null ? "NO" : "YES"]
+    ]);
+    $("accNote").textContent = a.soIndex === null
+        ? `✅ Stop-out (${A.so}%) болоогүй. LOT ${A.lot}, 1:${A.lev}.`
+        : `❌ ACCOUNT BLOWN: ${a.soTime} (свеч #${a.soIndex}) үед margin level ${A.so}%-иас доош орсон. Хамгийн багадаа $${Math.max(0, a.need).toFixed(2)} данс хэрэгтэй байсан.`;
 }
 
-/* ===== DATA LOADING ===== */
-
-async function loadInitialData(){
+async function loadInitialData() {
     const status = $("status");
-
     status.textContent = "Loading GOLD data...";
 
     try {
         const response = await fetch("/api/gold");
-
-        if(!response.ok){
-            throw new Error(`HTTP ${response.status}`);
-        }
-
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const payload = await response.json();
-
-        if(payload.error){
-            throw new Error(payload.error);
-        }
-
-        if(!Array.isArray(payload.candles) || !payload.candles.length){
+        if (payload.error) throw new Error(payload.error);
+        if (!Array.isArray(payload.candles) || !payload.candles.length) {
             throw new Error("No GOLD candle data returned.");
         }
 
         window.candles = payload.candles;
-
-        status.textContent =
-            `✅ GOLD data loaded — ${window.candles.length} candles`;
-
-        $("dataInfo").textContent =
-            `13 columns | ${window.candles.length} candles`;
-
-        applyIndicators();
-
-    }catch(error){
+        status.textContent = `✅ GOLD data loaded — ${window.candles.length} candles`;
+        $("dataInfo").textContent = `13 columns | ${window.candles.length} candles`;
+        window.applyIndicators();
+    } catch (error) {
         console.error("INITIAL DATA LOAD ERROR:", error);
-
-        status.textContent =
-            "❌ Failed to load GOLD data: " + error.message;
+        status.textContent = "❌ Failed to load GOLD data: " + error.message;
     }
 }
 
-const infoText=()=>`13 columns | ${getCandles().length} candles`;
+$("run").onclick = () => {
+    const btn = $("run");
+    if (!getCandles().length) return alert("No GOLD candle data loaded.");
+    const range = getBacktestRange();
+    if (range.count <= 0) return alert("Selected range has no candles.");
 
-$("run").onclick=()=>{
- const btn=$("run");
- if(!getCandles().length)
-    return alert("No GOLD candle data loaded.");
- const range=getBacktestRange();
- if(range.count<=0)return alert("Selected range has no candles.");
-
- btn.disabled=true;
- btn.textContent="RUNNING BACKTEST...";
- $("backtestStatus").textContent="Running hedge backtest...";
- try{
-  runBacktest();
-  const rangeText=!$("addRange").checked?`ALL ${range.count} CANDLES`
-   :range.mode==="LAST"?`LAST ${range.days} DAY${range.days>1?"S":""} — ${range.count} CANDLES`
-   :`DAY ${range.days} — ${range.count} CANDLES`;
-  $("backtestStatus").textContent=`✅ BACKTEST COMPLETED — ${rangeText}`;
- }catch(e){
-  console.error(e);
-  $("backtestStatus").textContent="❌ BACKTEST ERROR: "+e.message;
-  alert("BACKTEST ERROR:\n"+e.message);
- }finally{
-  btn.disabled=false;
-  btn.textContent="RUN HEDGE BACKTEST";
- }
+    btn.disabled = true;
+    btn.textContent = "RUNNING BACKTEST...";
+    $("backtestStatus").textContent = "Running hedge backtest...";
+    try {
+        runBacktest();
+        const rangeText = !$("addRange").checked ? `ALL ${range.count} CANDLES`
+            : range.mode === "LAST" ? `LAST ${range.days} DAY${range.days > 1 ? "S" : ""} — ${range.count} CANDLES`
+            : `DAY ${range.days} — ${range.count} CANDLES`;
+        $("backtestStatus").textContent = `✅ BACKTEST COMPLETED — ${rangeText}`;
+    } catch (e) {
+        console.error(e);
+        $("backtestStatus").textContent = "❌ BACKTEST ERROR: " + e.message;
+        alert("BACKTEST ERROR:\n" + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = "RUN HEDGE BACKTEST";
+    }
 };
 
-$("applyIndicators").onclick=applyIndicators;
-$("addRange").onchange=$("rangeMode").onchange=$("rangeDay").onchange=updateRangeUI;
+$("applyIndicators").onclick = window.applyIndicators;
+$("addRange").onchange = $("rangeMode").onchange = $("rangeDay").onchange = updateRangeUI;
 updateRangeUI();
-
 </script>
 
 <script src="/JS/condition.js"></script>
@@ -1077,27 +784,18 @@ updateRangeUI();
 
 <script>
 window.addEventListener("DOMContentLoaded", async () => {
-
     try {
         buildGroups();
-
         loadStrategyJSON(DEFAULT_TEST_STRATEGY);
-
         await loadInitialData();
-
     } catch (error) {
         console.error("INITIALIZATION ERROR:", error);
-
         const status = document.getElementById("status");
-
         if (status) {
-            status.textContent =
-                "❌ Initialization failed: " + error.message;
+            status.textContent = "❌ Initialization failed: " + error.message;
         }
     }
-
 });
-
 </script>
 
 </body>
