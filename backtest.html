@@ -540,6 +540,7 @@ function runBacktest() {
     });
 
     activeCandles.forEach((c, i) => {
+        const dataIndex = range.start + i;
         const lp = positions.LONG, sp = positions.SHORT;
         const bid = Number(c.bid), ask = Number(c.ask);
         const lpl = lp.map(p => bid - Number(p.entryPrice));
@@ -560,7 +561,7 @@ function runBacktest() {
         };
 
         specs.forEach(s => {
-            if (positionMode[s.type] === "MANY" && s.reset.length && evalGroup(s.reset, i, {}) === true) {
+            if (positionMode[s.type] === "MANY" && s.reset.length && evalGroup(s.reset, dataIndex, {}) === true) {
                 ready[s.type] = true;
             }
         });
@@ -572,7 +573,7 @@ function runBacktest() {
             if (armed[s.type]) return;
             const last = list[list.length - 1];
             const ctx = { ...dyn, longLimit: s.type === "LONG" ? last.limit : null, shortLimit: s.type === "SHORT" ? last.limit : null };
-            if (evalGroup(s.rc, i, ctx) === true) { armed[s.type] = true; }
+            if (evalGroup(s.rc, dataIndex, ctx) === true) { armed[s.type] = true; }
         });
 
         specs.forEach(s => {
@@ -581,7 +582,7 @@ function runBacktest() {
                 const pnlNow = s.type === "LONG" ? bid - p.entryPrice : p.entryPrice - ask;
                 p.peak = Math.max(p.peak, pnlNow);
                 const ctx = { ...dyn, armed: armed[s.type], longLimit: s.type === "LONG" ? p.limit : null, shortLimit: s.type === "SHORT" ? p.limit : null };
-                if (evalGroup(s.exit, i, ctx) === true) { closePosition(s.type, k, c); }
+                if (evalGroup(s.exit, dataIndex, ctx) === true) { closePosition(s.type, k, c); }
             }
             if (!positions[s.type].length) { armed[s.type] = false; }
         });
@@ -592,9 +593,9 @@ function runBacktest() {
             else if (mode === "MANY") {
                 if (!ready[t] || positions[t].length >= Number(maxPositions[t])) return;
             } else return;
-            const limits = getOpenLimits(i);
+            const limits = getOpenLimits(dataIndex);
             const ctx = { ...dyn, longCount: positions.LONG.length, shortCount: positions.SHORT.length, longLimit: limits.longLimit, shortLimit: limits.shortLimit };
-            if (evalGroup(s.open, i, ctx) === true) { openPosition(t, c, i); }
+            if (evalGroup(s.open, dataIndex, ctx) === true) { openPosition(t, c, dataIndex); }
         });
 
         {
