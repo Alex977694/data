@@ -101,8 +101,12 @@ async function initMarketData() {
         let macdDownStart = null;
         let macdPeakValue = 0;
         let macdPeakPrice = 0;
+        let macdPeakTime = null;
         let macdTroughValue = 0;
         let macdTroughPrice = 0;
+        let macdTroughTime = null;
+        let lastPeak = null;
+        let lastTrough = null;
         let macdUplimit = null;
         let macdDownlimit = null;
         let uplimitCrossLine = null;
@@ -170,23 +174,41 @@ async function initMarketData() {
             const priorClosedSignal = macdAt("signal", closedIndex - 1);
             if (closedIndex > 0 && closedLine !== null && priorClosedLine !== null) {
                 const closedCandle = data.candles[closedIndex];
-                if (priorClosedLine < 0 && closedLine > 0) {
+                if (priorClosedLine <= 0 && closedLine > 0) {
+                    if (macdDownStart !== null) {
+                        lastTrough = {
+                            macd_value: macdTroughValue,
+                            price: macdTroughPrice,
+                            time: macdTroughTime
+                        };
+                    }
                     macdUpStart = closedIndex;
                     macdPeakValue = closedLine;
                     macdPeakPrice = Number(closedCandle.open);
+                    macdPeakTime = indicatorTime(closedCandle);
                     macdInitial.macd_initial_up = { price: macdPeakPrice, time: indicatorTime(closedCandle) };
                 } else if (macdUpStart !== null && closedLine > macdPeakValue) {
                     macdPeakValue = closedLine;
                     macdPeakPrice = Number(closedCandle.open);
+                    macdPeakTime = indicatorTime(closedCandle);
                 }
-                if (priorClosedLine > 0 && closedLine < 0) {
+                if (priorClosedLine >= 0 && closedLine < 0) {
+                    if (macdUpStart !== null) {
+                        lastPeak = {
+                            macd_value: macdPeakValue,
+                            price: macdPeakPrice,
+                            time: macdPeakTime
+                        };
+                    }
                     macdDownStart = closedIndex;
                     macdTroughValue = closedLine;
                     macdTroughPrice = Number(closedCandle.open);
+                    macdTroughTime = indicatorTime(closedCandle);
                     macdInitial.macd_initial_down = { price: macdTroughPrice, time: indicatorTime(closedCandle) };
                 } else if (macdDownStart !== null && closedLine < macdTroughValue) {
                     macdTroughValue = closedLine;
                     macdTroughPrice = Number(closedCandle.open);
+                    macdTroughTime = indicatorTime(closedCandle);
                 }
             }
             if (closedIndex > 0 && closedLine !== null && priorClosedLine !== null
@@ -318,9 +340,21 @@ async function initMarketData() {
                 indicatorFields["macd_peak.price"] = macdPeakPrice;
                 indicatorFields["macd_trough.macd_value"] = macdTroughValue;
                 indicatorFields["macd_trough.price"] = macdTroughPrice;
+                if (lastPeak) {
+                    indicatorFields["last_peak.macd_value"] = lastPeak.macd_value;
+                    indicatorFields["last_peak.price"] = lastPeak.price;
+                    indicatorFields["last_peak.time"] = lastPeak.time;
+                }
+                if (lastTrough) {
+                    indicatorFields["last_trough.macd_value"] = lastTrough.macd_value;
+                    indicatorFields["last_trough.price"] = lastTrough.price;
+                    indicatorFields["last_trough.time"] = lastTrough.time;
+                }
             }
+            indicatorFields.macd_average = lastPeak && lastTrough
+                ? (lastPeak.macd_value + lastTrough.macd_value) / 2
+                : null;
             if (index >= 3) {
-                indicatorFields.macd_average = (macdPeakValue + macdTroughValue) / 2;
                 const previousMacdValues = [];
                 for (let at = Math.max(0, index - 4); at < index; at++) {
                     previousMacdValues.push(macdAt("line", at));
@@ -418,6 +452,8 @@ addKeys("RSI", "time", ["last_status_time"]);
 addKeys("MACD", "bool", ["macd_upcross", "macd_downcross", "macd_line_up", "macd_line_down", "macd_up", "macd_down"]);
 addKeys("MACD", "text", ["macd_trend"]);
 addKeys("MACD", "number", ["macd_min", "macd_max", "macd_average", "macd_uplimit", "macd_downlimit", "uplimit_cross_line", "downlimit_cross_line"]);
+addKeys("MACD", "number", ["last_peak.macd_value", "last_peak.price", "last_trough.macd_value", "last_trough.price"]);
+addKeys("MACD", "time", ["last_peak.time", "last_trough.time"]);
 ["macd_initial_up", "macd_initial_down", "signal_initial_up", "signal_initial_down"].forEach(p => {
     values.push({ name: `${p}_price`, source: "MACD", kind: "number" });
     values.push({ name: `${p}_time`, source: "MACD", kind: "time" });
