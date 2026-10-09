@@ -8,26 +8,49 @@ window.candles = window.candles || [];
 
 async function initMarketData() {
     const status = $("status") || document.getElementById("status");
-    if(status) status.textContent = "Loading GOLD data from Railway...";
+    if(status) status.textContent = "Loading GOLD data & Indicators from Railway...";
 
     try {
+        // 1. Үндсэн Gold лаа болон базовый массив татах
         const res = await fetch("https://web-production-c3082.up.railway.app/api/gold");
         const data = await res.json();
         
-        console.log("Raw Railway data:", data);
-
         if (!data.candles || !Array.isArray(data.candles)) {
             throw new Error("No candles found in response");
         }
 
-        // ==========================================
-        // Ямар нэгэн хиймэл spread хасахгүйгээр шууд Server-ийн Ask/Bid-ийг авна
-        // ==========================================
-        window.candles = data.candles;
-        // ==========================================
-        
-        console.log("✅ Candles loaded into Builder:", window.candles.length);
-        if(status) status.textContent = `✅ GOLD data loaded — ${window.candles.length} candles`;
+        // 2. RSI болон MACD дэвшилтэт тайлангуудыг серверээс зэрэг татах
+        const [rsiRes, macdRes] = await Promise.all([
+            fetch("https://web-production-c3082.up.railway.app/rsi/GOLD").then(r => r.json()).catch(() => ({})),
+            fetch("https://web-production-c3082.up.railway.app/macd/GOLD").then(r => r.json()).catch(() => ({}))
+        ]);
+
+        console.log("RSI Extended Data:", rsiRes);
+        console.log("MACD Extended Data:", macdRes);
+
+        // 3. Лаа тус бүр дээр серверээс ирсэн дэвшилтэт утгуудыг индексээр нь тааруулж шингээх
+        window.candles = data.candles.map((c, index) => {
+            // Хэрэв массив хэлбэрээр ирдэг бол индексээр нь, үгүй бол шууд утгаар нь авна
+            const getArrVal = (arr) => Array.isArray(arr) ? (arr[index] ?? null) : (arr ?? null);
+
+            return {
+                ...c,
+                // RSI нэмэлт статусууд
+                rsi_trend: getArrVal(rsiRes.trend),
+                rsi_last_status: getArrVal(rsiRes.last_status),
+                rsi_avg: getArrVal(rsiRes.average_status),
+                
+                // MACD нэмэлт статусууд
+                macd_trend: getArrVal(macdRes.trend),
+                
+                // Бодит Ask/Bid (хиймэл spread хасахгүй)
+                bid: Number(c.close),
+                ask: Number(c.close)
+            };
+        });
+
+        console.log("✅ Fully enriched candles loaded:", window.candles.length);
+        if(status) status.textContent = `✅ GOLD data & Indicators loaded — ${window.candles.length} candles`;
 
         if (typeof buildGroups === "function") {
             buildGroups();
@@ -37,8 +60,8 @@ async function initMarketData() {
         }
 
     } catch (e) {
-        console.error("❌ Failed to load candles from Railway:", e);
-        if(status) status.textContent = "❌ Failed to load GOLD data: " + e.message;
+        console.error("❌ Failed to load candles or indicators:", e);
+        if(status) status.textContent = "❌ Failed to load data: " + e.message;
     }
 }
 
