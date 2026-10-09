@@ -474,10 +474,12 @@ function updateRangeUI() {
         : `DAY ${day} — ${getBacktestRange().count} CANDLES`;
 }
 
-/* ===== BACKTEST ===== */
 function runBacktest() {
+    const allCandles = getCandles();
+    if (!allCandles.length) return alert("No GOLD candle data loaded.");
+
     const range = getBacktestRange();
-    const activeCandles = candles.slice(range.start, range.end);
+    const activeCandles = allCandles.slice(range.start, range.end);
     if (!activeCandles.length) return alert("Selected range has no candles.");
 
     if (!groups.longOpen.length && !groups.shortOpen.length)
