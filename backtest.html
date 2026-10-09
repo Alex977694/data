@@ -418,7 +418,7 @@ function trade(type, et, ep, xt, xp, limit) {
 
 function getOpenLimits(i) {
     const opens = [0, 1, 2, 3]
-        .map(n => val("OPEN" + n, i))
+        .map(n => val("candle_open_" + n, i))
         .filter(Number.isFinite);
 
     return {
