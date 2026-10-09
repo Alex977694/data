@@ -82,8 +82,37 @@ async function initMarketData() {
             const value = series[index - offset];
             return value === undefined ? null : toNum(value);
         };
+        const indicatorTime = candle => {
+            let timestamp = Number(candle?.open_time);
+            if (!Number.isFinite(timestamp)) return null;
+            if (timestamp < 1e11) timestamp *= 1000;
+            return new Date(timestamp + 8 * 60 * 60 * 1000).toISOString().replace("T", " ").slice(0, 19);
+        };
         let lastRsiStatus = "None";
+        let lastRsiStatusTime = null;
         let lastMacdTrend = "None";
+        const rsiCrossHistory = { s30u: [], s30d: [], s70u: [], s70d: [] };
+        const rsiTrendHistory = [];
+        let previousOpenup = false;
+        let previousOpendown = false;
+        let openupLimit = null;
+        let opendownLimit = null;
+        let macdUpStart = null;
+        let macdDownStart = null;
+        let macdPeakValue = 0;
+        let macdPeakPrice = 0;
+        let macdTroughValue = 0;
+        let macdTroughPrice = 0;
+        let macdUplimit = null;
+        let macdDownlimit = null;
+        let uplimitCrossLine = null;
+        let downlimitCrossLine = null;
+        const macdInitial = {
+            macd_initial_up: null,
+            macd_initial_down: null,
+            signal_initial_up: null,
+            signal_initial_down: null
+        };
 
         window.candles = data.candles.map((c, index) => {
             const rsiAt = n => seriesValue(rsiValues, n, rsiOffset);
@@ -100,12 +129,88 @@ async function initMarketData() {
                 : rsiCross["30_down"] ? "30D"
                 : rsiCross["70_up"] ? "70U"
                 : rsiCross["70_down"] ? "70D" : null;
-            if (rsiStatus) lastRsiStatus = rsiStatus;
+            if (rsiStatus) {
+                lastRsiStatus = rsiStatus;
+                lastRsiStatusTime = indicatorTime(c);
+            }
+
+            const rsiTrendStatus = previousRsi === null || currentRsi === null ? null
+                : previousRsi <= 30 && currentRsi > 30 ? "30U"
+                : previousRsi >= 30 && currentRsi < 30 ? "30D"
+                : previousRsi <= 50 && currentRsi > 50 ? "50U"
+                : previousRsi >= 50 && currentRsi < 50 ? "50D"
+                : previousRsi <= 70 && currentRsi > 70 ? "70U"
+                : previousRsi >= 70 && currentRsi < 70 ? "70D" : null;
+            if (rsiTrendStatus && rsiTrendHistory[0] !== rsiTrendStatus) {
+                rsiTrendHistory.unshift(rsiTrendStatus);
+                if (rsiTrendHistory.length > 10) rsiTrendHistory.pop();
+            }
+            let historicalRsiTrend = "None";
+            for (let trendIndex = rsiTrendHistory.length - 1; trendIndex > 0; trendIndex--) {
+                const current = rsiTrendHistory[trendIndex];
+                const previous = rsiTrendHistory[trendIndex - 1];
+                if ((previous === "30U" && current === "50U") || (previous === "50U" && current === "70U")) {
+                    historicalRsiTrend = previous === "30U" ? "uptrand1" : "uptrand2";
+                    break;
+                }
+                if ((previous === "70D" && current === "50D") || (previous === "50D" && current === "30D")) {
+                    historicalRsiTrend = previous === "70D" ? "downtrand1" : "downtrand2";
+                    break;
+                }
+            }
 
             const currentLine = macdAt("line", index);
             const previousLine = macdAt("line", index - 1);
             const currentSignal = macdAt("signal", index);
             const previousSignal = macdAt("signal", index - 1);
+            const closedIndex = index - 1;
+            const closedLine = macdAt("line", closedIndex);
+            const priorClosedLine = macdAt("line", closedIndex - 1);
+            const closedSignal = macdAt("signal", closedIndex);
+            const priorClosedSignal = macdAt("signal", closedIndex - 1);
+            if (closedIndex > 0 && closedLine !== null && priorClosedLine !== null) {
+                const closedCandle = data.candles[closedIndex];
+                if (priorClosedLine < 0 && closedLine > 0) {
+                    macdUpStart = closedIndex;
+                    macdPeakValue = closedLine;
+                    macdPeakPrice = Number(closedCandle.open);
+                    macdInitial.macd_initial_up = { price: macdPeakPrice, time: indicatorTime(closedCandle) };
+                } else if (macdUpStart !== null && closedLine > macdPeakValue) {
+                    macdPeakValue = closedLine;
+                    macdPeakPrice = Number(closedCandle.open);
+                }
+                if (priorClosedLine > 0 && closedLine < 0) {
+                    macdDownStart = closedIndex;
+                    macdTroughValue = closedLine;
+                    macdTroughPrice = Number(closedCandle.open);
+                    macdInitial.macd_initial_down = { price: macdTroughPrice, time: indicatorTime(closedCandle) };
+                } else if (macdDownStart !== null && closedLine < macdTroughValue) {
+                    macdTroughValue = closedLine;
+                    macdTroughPrice = Number(closedCandle.open);
+                }
+            }
+            if (closedIndex > 0 && closedLine !== null && priorClosedLine !== null
+                && closedSignal !== null && priorClosedSignal !== null) {
+                const closedCandle = data.candles[closedIndex];
+                if (priorClosedSignal < 0 && closedSignal > 0) {
+                    macdInitial.signal_initial_up = { price: Number(closedCandle.open), time: indicatorTime(closedCandle) };
+                }
+                if (priorClosedSignal > 0 && closedSignal < 0) {
+                    macdInitial.signal_initial_down = { price: Number(closedCandle.open), time: indicatorTime(closedCandle) };
+                }
+                if (closedIndex >= 3) {
+                    const crossWindow = [closedIndex - 3, closedIndex - 2, closedIndex - 1, closedIndex]
+                        .map(at => macdAt("line", at));
+                    if (priorClosedLine < priorClosedSignal && closedLine > closedSignal) {
+                        macdUplimit = Math.min(...crossWindow);
+                        uplimitCrossLine = closedLine;
+                    }
+                    if (priorClosedLine > priorClosedSignal && closedLine < closedSignal) {
+                        macdDownlimit = Math.max(...crossWindow);
+                        downlimitCrossLine = closedLine;
+                    }
+                }
+            }
             const macdUpcross = previousLine !== null && previousSignal !== null
                 && currentLine !== null && currentSignal !== null
                 && previousLine <= previousSignal && currentLine > currentSignal;
@@ -116,6 +221,38 @@ async function initMarketData() {
             else if (macdDowncross) lastMacdTrend = "DOWN";
 
             const indicatorFields = {};
+            const ohlcWindow = data.candles.slice(Math.max(0, index - 3), index + 1);
+            if (ohlcWindow.length === 4) {
+                const opens = ohlcWindow.map(item => Number(item.open));
+                const closes = ohlcWindow.map(item => Number(item.close));
+                const highs = ohlcWindow.map(item => Number(item.high));
+                const lows = ohlcWindow.map(item => Number(item.low));
+                indicatorFields.min_open = Math.min(...opens);
+                indicatorFields.max_open = Math.max(...opens);
+                indicatorFields.min_close = Math.min(...closes);
+                indicatorFields.max_close = Math.max(...closes);
+                indicatorFields.max_high = Math.max(...highs);
+                indicatorFields.min_low = Math.min(...lows);
+            }
+            if (index > 0) {
+                const open = Number(c.open);
+                const previousOpen = Number(data.candles[index - 1].open);
+                const openup = open > previousOpen;
+                const opendown = open < previousOpen;
+                if (openup && !previousOpenup && ohlcWindow.length === 4) {
+                    openupLimit = Math.min(...ohlcWindow.map(item => Number(item.open)));
+                }
+                if (opendown && !previousOpendown && ohlcWindow.length === 4) {
+                    opendownLimit = Math.max(...ohlcWindow.map(item => Number(item.open)));
+                }
+                previousOpenup = openup;
+                previousOpendown = opendown;
+                indicatorFields.openup = openup;
+                indicatorFields.opendown = opendown;
+                if (openupLimit !== null) indicatorFields.openup_limit = openupLimit;
+                if (opendownLimit !== null) indicatorFields.opendown_limit = opendownLimit;
+            }
+
             [0, 1, 2, 3].forEach(offset => {
                 const value = rsiAt(index - offset);
                 if (value !== null) indicatorFields[`rsi${offset}`] = value;
@@ -129,6 +266,31 @@ async function initMarketData() {
                     }
                 });
             if (previousRsi !== null && currentRsi !== null) indicatorFields.last_status = lastRsiStatus;
+            if (lastRsiStatusTime !== null) indicatorFields.last_status_time = lastRsiStatusTime;
+            if (previousRsi !== null && currentRsi !== null) indicatorFields.trend = historicalRsiTrend;
+
+            if (ohlcWindow.length === 4) {
+                const eventKeys = { "30_up": "s30u", "30_down": "s30d", "70_up": "s70u", "70_down": "s70d" };
+                const opens = ohlcWindow.map(item => Number(item.open));
+                Object.entries(eventKeys).forEach(([eventName, historyKey]) => {
+                    if (!rsiCross[eventName]) return;
+                    const price = eventName.endsWith("_up") ? Math.min(...opens) : Math.max(...opens);
+                    rsiCrossHistory[historyKey].unshift({ price, time: indicatorTime(c) });
+                    if (rsiCrossHistory[historyKey].length > 2) rsiCrossHistory[historyKey].pop();
+                });
+            }
+            Object.entries(rsiCrossHistory).forEach(([historyKey, history]) => {
+                if (!history.length) return;
+                indicatorFields[`cross_history.${historyKey}`] = history[0].price;
+                indicatorFields[`cross_history.${historyKey}_time`] = history[0].time;
+                if (history[1]) {
+                    indicatorFields[`cross_history.${historyKey}_prev`] = history[1].price;
+                    indicatorFields[`cross_history.${historyKey}_prev_time`] = history[1].time;
+                }
+            });
+            const latest30up = rsiCrossHistory.s30u[0]?.price;
+            const latest70down = rsiCrossHistory.s70d[0]?.price;
+            if (latest30up && latest70down) indicatorFields.average_status = (latest30up + latest70down) / 2;
 
             const macdNames = { line: "macd_line", signal: "macd_signal", histogram: "macd_histogram" };
             Object.entries(macdNames).forEach(([key, name]) => {
@@ -151,6 +313,32 @@ async function initMarketData() {
                 indicatorFields.macd_upcross = macdUpcross;
                 indicatorFields.macd_downcross = macdDowncross;
             }
+            if (currentLine !== null) {
+                indicatorFields["macd_peak.macd_value"] = macdPeakValue;
+                indicatorFields["macd_peak.price"] = macdPeakPrice;
+                indicatorFields["macd_trough.macd_value"] = macdTroughValue;
+                indicatorFields["macd_trough.price"] = macdTroughPrice;
+            }
+            if (index >= 3) {
+                indicatorFields.macd_average = (macdPeakValue + macdTroughValue) / 2;
+                const previousMacdValues = [];
+                for (let at = Math.max(0, index - 4); at < index; at++) {
+                    previousMacdValues.push(macdAt("line", at));
+                }
+                if (previousMacdValues.length && previousMacdValues.every(value => value !== null)) {
+                    indicatorFields.macd_min = Math.min(...previousMacdValues);
+                    indicatorFields.macd_max = Math.max(...previousMacdValues);
+                }
+            }
+            if (macdUplimit !== null) indicatorFields.macd_uplimit = macdUplimit;
+            if (macdDownlimit !== null) indicatorFields.macd_downlimit = macdDownlimit;
+            if (uplimitCrossLine !== null) indicatorFields.uplimit_cross_line = uplimitCrossLine;
+            if (downlimitCrossLine !== null) indicatorFields.downlimit_cross_line = downlimitCrossLine;
+            Object.entries(macdInitial).forEach(([key, value]) => {
+                if (!value) return;
+                indicatorFields[`${key}_price`] = value.price;
+                indicatorFields[`${key}_time`] = value.time;
+            });
 
             return {
                 ...c,
