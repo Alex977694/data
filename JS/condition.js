@@ -3,7 +3,6 @@
 const $ = id => document.getElementById(id);
 
 // ==================== 1. RAILWAY DATAS & CANDLES ====================
-// Зөвхөн window.candles л ашиглана, өөр local candles байхгүй!
 window.candles = window.candles || [];
 
 async function initMarketData() {
@@ -11,7 +10,6 @@ async function initMarketData() {
     if(status) status.textContent = "Loading GOLD data & Indicators from Railway...";
 
     try {
-        // 1. Үндсэн Gold лаа болон базовый массив татах
         const res = await fetch("https://web-production-c3082.up.railway.app/api/gold");
         const data = await res.json();
         
@@ -19,7 +17,6 @@ async function initMarketData() {
             throw new Error("No candles found in response");
         }
 
-        // 2. RSI болон MACD дэвшилтэт тайлангуудыг серверээс зэрэг татах
         const [rsiRes, macdRes] = await Promise.all([
             fetch("https://web-production-c3082.up.railway.app/rsi/GOLD").then(r => r.json()).catch(() => ({})),
             fetch("https://web-production-c3082.up.railway.app/macd/GOLD").then(r => r.json()).catch(() => ({}))
@@ -28,21 +25,18 @@ async function initMarketData() {
         console.log("RSI Extended Data:", rsiRes);
         console.log("MACD Extended Data:", macdRes);
 
-        // 3. Лаа тус бүр дээр серверээс ирсэн дэвшилтэт утгуудыг индексээр нь тааруулж шингээх
         window.candles = data.candles.map((c, index) => {
             const getArrVal = (arr) => Array.isArray(arr) ? (arr[index] ?? null) : (arr ?? null);
 
             return {
                 ...c,
-                // RSI нэмэлт статусууд
-                rsi_trend: getArrVal(rsiRes.trend),
-                rsi_last_status: getArrVal(rsiRes.last_status),
-                rsi_avg: getArrVal(rsiRes.average_status),
+                // RSI нарийн тоон утгууд болон статусууд
+                rsi_avg: rsiRes.average_status ?? null,
+                s30u: rsiRes.cross_history?.s30u ?? null,
+                s30d: rsiRes.cross_history?.s30d ?? null,
+                s70u: rsiRes.cross_history?.s70u ?? null,
+                s70d: rsiRes.cross_history?.s70d ?? null,
                 
-                // MACD нэмэлт статусууд
-                macd_trend: getArrVal(macdRes.trend),
-                
-                // Бодит Ask/Bid (хиймэл spread хасахгүй)
                 bid: Number(c.close),
                 ask: Number(c.close)
             };
@@ -98,11 +92,14 @@ const CFG={
  shortReadyClose:["SHORT READY CLOSE CONDITION","SHORT READY CLOSE","+ ADD READY CLOSE CONDITION"],
 };
 
-/* CANDLE VALUES */
+/* CANDLE & INDICATOR FIELDS */
 const fields=[
  ["open_time","OPEN_TIME"],["open","OPEN"],["high","HIGH"],["low","LOW"],
- ["close","CLOSE"],["volume","VOLUME"],["rsi","RSI"],["macd_line","MACD_LINE"],
- ["macd_signal","MACD_SIGNAL"],["macd_histogram","MACD_HISTOGRAM"],["bid","BID"],["ask","ASK"]
+ ["close","CLOSE"],["volume","VOLUME"],
+ ["rsi","RSI"], ["rsi_avg","RSI_AVG"],
+ ["s30u","RSI_S30U"], ["s30d","RSI_S30D"], ["s70u","RSI_S70U"], ["s70d","RSI_S70D"],
+ ["macd_line","MACD_LINE"], ["macd_signal","MACD_SIGNAL"], ["macd_histogram","MACD_HISTOGRAM"],
+ ["bid","BID"], ["ask","ASK"]
 ];
 
 const values=[];
@@ -117,7 +114,7 @@ fields.forEach(([field,label])=>{
  "LAST_LONG_PNL","LAST_SHORT_PNL","MAX_LONG_PNL","MAX_SHORT_PNL"
 ].forEach(name=>values.push({name,dynamic:true}));
 
-/* PRESETS: [label,left,op,rightType,right] or {label,conditions} */
+/* PRESETS & ADVANCED MIXED CONDITIONS */
 const P=(l,o,t,r)=>[`${l} ${o} ${t==="number"?"NUMBER":r}`,l,o,t,r];
 const V=(l,o,r)=>P(l,o,"value",r);
 const NUM=(l,o)=>P(l,o,"number","");
@@ -127,20 +124,36 @@ const rsi2=(a,b,n)=>({
 });
 
 const PRESETS=[
- V("OPEN0",">","OPEN1"),V("OPEN0","<","OPEN1"),
+ V("OPEN0",">","OPEN1"), V("OPEN0","<","OPEN1"),
+ V("CLOSE0",">","OPEN0"), V("CLOSE0","<","OPEN0"),
+ V("HIGH0",">","HIGH1"), V("LOW0","<","LOW1"),
 
- P("OPEN0",">","long_limit","LONG_LIMIT"),P("OPEN0","<","long_limit","LONG_LIMIT"),
- P("OPEN0",">","short_limit","SHORT_LIMIT"),P("OPEN0","<","short_limit","SHORT_LIMIT"),
+ P("OPEN0",">","long_limit","LONG_LIMIT"), P("OPEN0","<","long_limit","LONG_LIMIT"),
+ P("OPEN0",">","short_limit","SHORT_LIMIT"), P("OPEN0","<","short_limit","SHORT_LIMIT"),
 
- NUM("RSI1",">"),NUM("RSI1","<"),V("RSI1",">","RSI2"),V("RSI1","<","RSI2"),
- rsi2(">","<",30),rsi2("<",">",30),rsi2(">","<",70),rsi2("<",">",70),
+ NUM("RSI1",">"), NUM("RSI1","<"), V("RSI1",">","RSI2"), V("RSI1","<","RSI2"),
+ rsi2(">","<",30), rsi2("<",">",30), rsi2(">","<",70), rsi2("<",">",70),
 
- V("MACD_LINE1",">","MACD_SIGNAL1"),V("MACD_LINE1","<","MACD_SIGNAL1"),
- V("MACD_HISTOGRAM1",">","MACD_HISTOGRAM2"),V("MACD_HISTOGRAM1","<","MACD_HISTOGRAM2"),
- NUM("MACD_HISTOGRAM1",">"),NUM("MACD_HISTOGRAM1","<"),
- NUM("MACD_LINE1",">"),NUM("MACD_LINE1","<"),
+ // Дэвшилтэт холимог (Mixed / Advanced) нөхцөллүүд
+ {
+  label: "CLOSE0 > RSI_AVG0 AND RSI1 < 30",
+  conditions: [["CLOSE0", ">", "value", "RSI_AVG0"], ["RSI1", "<", "number", "30", "AND"]]
+ },
+ {
+  label: "CLOSE0 < RSI_AVG0 AND RSI1 > 70",
+  conditions: [["CLOSE0", "<", "value", "RSI_AVG0"], ["RSI1", ">", "number", "70", "AND"]]
+ },
+ {
+  label: "CLOSE0 > RSI_S30U0 AND MACD_HISTOGRAM0 > 0",
+  conditions: [["CLOSE0", ">", "value", "RSI_S30U0"], ["MACD_HISTOGRAM0", ">", "number", "0", "AND"]]
+ },
+
+ V("MACD_LINE1",">","MACD_SIGNAL1"), V("MACD_LINE1","<","MACD_SIGNAL1"),
+ V("MACD_HISTOGRAM1",">","MACD_HISTOGRAM2"), V("MACD_HISTOGRAM1","<","MACD_HISTOGRAM2"),
+ NUM("MACD_HISTOGRAM1",">"), NUM("MACD_HISTOGRAM1","<"),
+ NUM("MACD_LINE1",">"), NUM("MACD_LINE1","<"),
     
- V("VOLUME0",">","VOLUME1"),V("VOLUME0","<","VOLUME1")
+ V("VOLUME0",">","VOLUME1"), V("VOLUME0","<","VOLUME1")
 ];
 
 /* CONDITION OBJECT */
@@ -220,21 +233,14 @@ function val(name, i, ctx = {}) {
     }
 
     const d = def(name);
-
-    if (!d) {
-        return null;
-    }
+    if (!d) return null;
 
     const data = ctx.data || candles;
-
     const n = i + d.offset;
 
-    if (n < 0 || n >= data.length) {
-        return null;
-    }
+    if (n < 0 || n >= data.length) return null;
 
     const x = Number(data[n][d.field]);
-
     return Number.isFinite(x) ? x : null;
 }
 
@@ -246,31 +252,17 @@ function compare(a,o,b){
 
 function evalCondition(c,i,ctx={}){
     if(!c.left)return null;
-
-    if(c.readyClose && ctx.armed===false)
-        return false;
-
-    if(
-        (c.rightType==="value" || c.rightType==="number") &&
-        !c.right
-    )
-        return null;
+    if(c.readyClose && ctx.armed===false) return false;
+    if((c.rightType==="value" || c.rightType==="number") && !c.right) return null;
 
     const a = val(c.left,i,ctx);
-
     const b =
-        c.rightType === "number"
-            ? Number(c.right)
-        : c.rightType === "long_limit"
-            ? Number(ctx.longLimit)
-        : c.rightType === "short_limit"
-            ? Number(ctx.shortLimit)
+        c.rightType === "number" ? Number(c.right)
+        : c.rightType === "long_limit" ? Number(ctx.longLimit)
+        : c.rightType === "short_limit" ? Number(ctx.shortLimit)
         : val(c.right,i,ctx);
 
-    return Number.isFinite(a) &&
-           Number.isFinite(b)
-        ? compare(a,c.operator,b)
-        : null;
+    return Number.isFinite(a) && Number.isFinite(b) ? compare(a,c.operator,b) : null;
 }
 
 /* GROUP */
@@ -324,7 +316,6 @@ function renderGroup(type){
   ));
 
   r.appendChild(makeSelect(c.left,"LEFT VALUE",v=>{c.left=v;preview(type)}));
-
   r.appendChild(plainSelect(OPS,c.operator||">",v=>{c.operator=v;preview(type)}));
 
   r.appendChild(plainSelect(
@@ -464,10 +455,8 @@ function buildGroups(){
    document.querySelectorAll(`input[name="${key}PositionMode"]`).forEach(radio=>{
     radio.onchange=()=>{
      positionMode[side]=radio.value;
-
      const wrap=$(key+"MaxPosWrap"),input=$(key+"MaxPos");
      if(wrap)wrap.style.display=radio.value==="MANY"?"inline-flex":"none";
-
      if(input){
       const setMax=()=>{
        const n=parseInt(input.value,10);
@@ -476,7 +465,6 @@ function buildGroups(){
       input.oninput=setMax;
       setMax();
      }
-
      updateModeVisibility(side);
     };
    });
