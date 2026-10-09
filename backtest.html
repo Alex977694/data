@@ -278,11 +278,11 @@ ADD RANGE
 // Глобал массив үүсгэх
 window.candles = window.candles || [];
 
-// getCandles болон candles-ийг window.candles руу холбох
+// window.candles болон local candles хоёрыг нэгдмэл байлгах
 const getCandles = () => {
     return Array.isArray(window.candles) && window.candles.length > 0 
         ? window.candles 
-        : [];
+        : (Array.isArray(candles) ? candles : []);
 };
 
 // Туслах хувьсагч байдлаар ашиглах бол getter ашиглах эсвэл шууд window.candles-г дуудах
