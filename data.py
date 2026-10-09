@@ -456,33 +456,20 @@ def get_gold_for_backtest():
         )
 
     try:
-        # =====================================================
-        # RAILWAY MACD ARRAYS (arrays.py файлын функц)
-        # =====================================================
         macd_data = calculate_macd_arrays(rows)
         macd_line_array = macd_data.get("macd_line_array", [])
         macd_signal_array = macd_data.get("macd_signal_array", [])
         macd_histogram_array = macd_data.get("macd_histogram_array", [])
 
-        # =====================================================
-        # RAILWAY RSI ARRAYS
-        # =====================================================
-        # calculate_rsi_array нь шууд list (жагсаалт) буцаадаг тул .get() хэрэглэхгүй
         rsi_array = calculate_rsi_array(rows, window=7)
         if not isinstance(rsi_array, list):
-            rsi_array = [] # Хэрэв өөр форматтай байвал хамгаалах үүднээс
+            rsi_array = []
 
-        # =====================================================
-        # CANDLES
-        # =====================================================
         candles = []
 
         for i, row in enumerate(rows):
-            # Лаа бүрийн өөрийнх нь close үнийг bid болон ask болгон ашиглах (ямар нэгэн хиймэл хасалт байхгүй)
             candle_close = float(row[4])
-            bid = candle_close
-            ask = candle_close
-
+            
             candles.append({
                 "open_time": float(row[0]),
                 "open": float(row[1]),
@@ -512,9 +499,9 @@ def get_gold_for_backtest():
                     else None
                 ),
 
-                # Лаа бүрийн бодит үнээр бичигдэх болно
-                "bid": bid,
-                "ask": ask
+                # Ямар нэгэн хиймэл spread хасахгүй, ask/bid бодит close үнээр явагдана
+                "bid": candle_close,
+                "ask": candle_close
             })
 
         return {
@@ -714,190 +701,11 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
 
-
-
-# ==================== REAL TRADING BACKGROUND WORKER (MACD & RSI LOGIC) ====================
-from client import (get_client, get_open_positions, get_symbol_rules,
-                    open_long_position, open_short_position,
-                    close_long_position, close_short_position)
-
-trade_is_running = False
-trade_thread = None
-trade_lock = threading.Lock()
-
-def background_real_trader():
-    global trade_is_running
-    print("🤖 [SERVER REAL TRADER] Бодит MACD/RSI арилжааны бот эхэллээ...")
-
-    client = get_client()
-    if not client:
-        print("🔥 Client үүсгэж чадсангүй. Бот зогслоо.")
-        trade_is_running = False
-        return
-
-    position_counts = {}
-
-    while trade_is_running:
-        try:
-            with selected_lock:
-                symbols = list(selected_symbols)
-            
-            if not symbols:
-                time.sleep(5)
-                continue
-
-            current_time = time.strftime("%Y-%m-%d %H:%M:%S")
-
-            for symbol in symbols:
-                with cache_lock:
-                    if symbol not in kline_history or len(kline_history[symbol]) < 50:
-                        continue
-                    klines = kline_history[symbol]
-                    try:
-                        open0 = float(klines[-1][4])
-                        open1 = float(klines[-2][4])
-                    except (IndexError, TypeError):
-                        continue
-
-                # Сервер дээрх индикаторуудыг шууд ашиглах
-                macd_res = calculate_macd_report(klines, symbol)
-                rsi_res = calculate_rsi_report(klines, symbol)
-
-                if "error" in macd_res or "error" in rsi_res:
-                    continue
-
-                last_status = rsi_res.get("last_status", "None")
-                line_dict = macd_res.get("line", {})
-                macd_line1 = float(line_dict.get("-1", 0))
-                macd_line2 = float(line_dict.get("-2", 0))
-                macd_average = float(macd_res.get("macd_average") or 0)
-
-                open_positions = get_open_positions(client)
-
-                long_opened = False
-                short_opened = False
-                long_total_qty = 0.0
-                short_total_qty = 0.0
-
-                for pos in open_positions.values():
-                    if pos.get('symbol') != symbol:
-                        continue
-
-                    if pos.get('positionSide') == 'LONG' and abs(float(pos.get('positionAmt', 0))) > 0:
-                        long_opened = True
-                        long_total_qty = abs(float(pos.get('positionAmt', 0)))
-                    elif pos.get('positionSide') == 'SHORT' and abs(float(pos.get('positionAmt', 0))) > 0:
-                        short_opened = True
-                        short_total_qty = abs(float(pos.get('positionAmt', 0)))
-
-                total_pnl = 0.0
-                pnl_details = []
-                for pos in open_positions.values():
-                    if pos.get('symbol') != symbol:
-                        continue
-                    try:
-                        pnl = float(pos.get('unRealizedProfit', 0.0))
-                        total_pnl += pnl
-                        pnl_details.append(f"{pos['symbol']} {pos['positionSide']}: {pnl:+.2f} USDT")
-                    except (ValueError, TypeError):
-                        continue
-
-                if symbol not in position_counts:
-                    position_counts[symbol] = {"long": 0, "short": 0}
-                
-                if not long_opened and not short_opened:
-                    position_counts[symbol] = {"long": 0, "short": 0}
-
-                print(f"\n--- [{current_time}] ---")
-                print(f"SYMBOL: {symbol} | open0: {open0} | open1: {open1} | RSI Status: {last_status}")
-                print(f"MACD Line1: {macd_line1:.6f} | Line2: {macd_line2:.6f} | Avg: {macd_average:.6f}")
-                print(f"POSITIONS: Long Open? {long_opened} | Short Open? {short_opened}")
-
-                if pnl_details:
-                    print(f"PNL: {' | '.join(pnl_details)}")
-                print(f"TOTAL PNL: {total_pnl:+.2f} USDT")
-
-                rules = get_symbol_rules(client, symbol)
-                if not rules:
-                    print(f"⚠️ {symbol}-н арилжааны дүрмийг авч чадсангүй. Түр алгасаж байна.")
-                    continue
-
-                # --- 1. LONG ХААХ НӨХЦӨЛ (MACD Cross Down) ---
-                if long_opened and (macd_line1 <= macd_average and macd_line2 >= macd_average):
-                    print(f"✅ [LONG CLOSE] {symbol} @ {open0}")
-                    pos_info = open_positions.get(f"{symbol}_LONG")
-                    if pos_info:
-                        qty_to_close = abs(float(pos_info['positionAmt']))
-                        if qty_to_close > 0:
-                            close_long_position(client, symbol, qty_to_close, info=rules)
-
-                # --- 2. SHORT ХААХ НӨХЦӨЛ (MACD Cross Up) ---
-                if short_opened and (macd_line1 >= macd_average and macd_line2 <= macd_average):
-                    print(f"✅ [SHORT CLOSE] {symbol} @ {open0}")
-                    pos_info = open_positions.get(f"{symbol}_SHORT")
-                    if pos_info:
-                        qty_to_close = abs(float(pos_info['positionAmt']))
-                        if qty_to_close > 0:
-                            close_short_position(client, symbol, qty_to_close, info=rules)
-
-                # --- 3. LONG НЭЭХ НӨХЦӨЛ ---
-                long_condition = (
-                    macd_line1 > macd_average 
-                    and macd_line2 <= macd_average 
-                    and (last_status == "30U" or last_status == "70U")
-                )
-                if not long_opened and long_condition:
-                    print(f"🟢 [LONG OPEN] {symbol} @ {open0}")
-                    result = open_long_position(client, symbol, info=rules)
-                    if result and not result.get("error"):
-                        position_counts[symbol]["long"] += 1
-                        time.sleep(3)
-
-                # --- 4. SHORT НЭЭХ НӨХЦӨЛ ---
-                short_condition = (
-                    macd_line1 < macd_average 
-                    and macd_line2 >= macd_average 
-                    and (last_status == "70D" or last_status == "30D")
-                )
-                if not short_opened and short_condition:
-                    print(f"🔴 [SHORT OPEN] {symbol} @ {open0}")
-                    result = open_short_position(client, symbol, info=rules)
-                    if result and not result.get("error"):
-                        position_counts[symbol]["short"] += 1
-                        time.sleep(3)
-
-        except Exception as e:
-            print(f"🔥 REAL TRADER ERROR: {e}")
-
-        time.sleep(5)
-    print("🛑 [SERVER REAL TRADER] Бодит арилжааны бот зогслоо.")
-
-@app.get("/start-trade")
-def start_trade_bot():
-    global trade_is_running, trade_thread
-    with trade_lock:
-        if trade_is_running:
-            return {"status": "real trade bot already running"}
-        trade_is_running = True
-        trade_thread = threading.Thread(target=background_real_trader, daemon=True)
-        trade_thread.start()
-    return {"status": "real trade bot started successfully"}
-
-@app.get("/stop-trade")
-def stop_trade_bot():
-    global trade_is_running
-    with trade_lock:
-        if not trade_is_running:
-            return {"status": "real trade bot already stopped"}
-        trade_is_running = False
-    return {"status": "real trade bot stop signal sent"}
-
-# Глобал түвшинд зарлах (Хэрэв байхгүй бол)
 market_quotes = {}
 
 @app.post("/api/gold-update")
 def receive_gold_candles(data: dict):
-    global market_quotes  # <-- Энийг нэмэх
+    global market_quotes
     symbol = data.get("symbol", "GOLD").upper()
     candles = data.get("candles", [])
     ask_price = data.get("ask", 0.0)
@@ -909,10 +717,13 @@ def receive_gold_candles(data: dict):
     try:
         formatted_candles = []
         for x in candles:
-            # Таны өмнөх форматлах хэсэг...
+            # MT5 цаг секундийг миллисекунд болгож жигдлэх (Binance-тай цаг нь зөрөхгүй байх зорилгоор)
+            raw_time = int(x["open_time"])
+            t = raw_time * 1000 if raw_time < 10000000000 else raw_time
+            
             formatted_candles.append([
-                int(x["open_time"]), float(x["open"]), float(x["high"]), 
-                float(x["low"]), float(x["close"]), float(x["volume"]), int(x["open_time"])
+                t, float(x["open"]), float(x["high"]), 
+                float(x["low"]), float(x["close"]), float(x["volume"]), t
             ])
 
         with cache_lock:
