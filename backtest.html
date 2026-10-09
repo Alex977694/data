@@ -273,80 +273,6 @@ ADD RANGE
 
 "use strict";
 
-document.addEventListener("DOMContentLoaded", () => {
-
-    const indicatorBtn = document.getElementById("toggleIndicators");
-    const settingsBtn = document.getElementById("toggleChartSettings");
-    const settings = document.getElementById("chartSettings");
-
-    /*
-     * INDICATORS button
-     * RSI / MACD indicator panel-ийг show/hide хийнэ.
-     */
-    if (indicatorBtn) {
-
-        indicatorBtn.addEventListener("click", () => {
-
-            const rsi = document.getElementById("showRSI");
-            const macd = document.getElementById("showMACD");
-
-            if (rsi) {
-                rsi.checked = !rsi.checked;
-            }
-
-            if (macd) {
-                macd.checked = !macd.checked;
-            }
-
-            if (typeof window.redrawChart === "function") {
-                window.redrawChart();
-            }
-
-        });
-
-    }
-
-
-    /*
-     * ⚙ button
-     * RSI / MACD settings panel-ийг нээнэ.
-     */
-    if (settingsBtn && settings) {
-
-        settingsBtn.addEventListener("click", () => {
-
-            const hidden =
-                settings.style.display === "none" ||
-                settings.style.display === "";
-
-            settings.style.display =
-                hidden ? "block" : "none";
-
-        });
-
-    }
-
-
-    /*
-     * APPLY button
-     */
-    const applyBtn =
-        document.getElementById("applyIndicators");
-
-    if (applyBtn) {
-
-        applyBtn.addEventListener("click", () => {
-
-            if (typeof window.applyIndicators === "function") {
-                window.applyIndicators();
-            }
-
-        });
-
-    }
-
-})
-
 window.candles = [];
 
 const getCandles = () =>
@@ -435,6 +361,80 @@ function applyIndicators() {
     $("dataInfo").textContent =
         `13 columns | ${candles.length} candles | RSI ${rp} ${rs.toUpperCase()} | MACD ${mf}/${ms}/${mg}`;
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+
+    const indicatorBtn = document.getElementById("toggleIndicators");
+    const settingsBtn = document.getElementById("toggleChartSettings");
+    const settings = document.getElementById("chartSettings");
+
+    /*
+     * INDICATORS button
+     * RSI / MACD indicator panel-ийг show/hide хийнэ.
+     */
+    if (indicatorBtn) {
+
+        indicatorBtn.addEventListener("click", () => {
+
+            const rsi = document.getElementById("showRSI");
+            const macd = document.getElementById("showMACD");
+
+            if (rsi) {
+                rsi.checked = !rsi.checked;
+            }
+
+            if (macd) {
+                macd.checked = !macd.checked;
+            }
+
+            if (typeof window.redrawChart === "function") {
+                window.redrawChart();
+            }
+
+        });
+
+    }
+
+
+    /*
+     * ⚙ button
+     * RSI / MACD settings panel-ийг нээнэ.
+     */
+    if (settingsBtn && settings) {
+
+        settingsBtn.addEventListener("click", () => {
+
+            const hidden =
+                settings.style.display === "none" ||
+                settings.style.display === "";
+
+            settings.style.display =
+                hidden ? "block" : "none";
+
+        });
+
+    }
+
+
+    /*
+     * APPLY button
+     */
+    const applyBtn =
+        document.getElementById("applyIndicators");
+
+    if (applyBtn) {
+
+        applyBtn.addEventListener("click", () => {
+
+            if (typeof window.applyIndicators === "function") {
+                window.applyIndicators();
+            }
+
+        });
+
+    }
+
+})
 
  /* ==========================================
     UPDATE META CHART DIRECTLY
