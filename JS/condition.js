@@ -38,7 +38,7 @@ async function initMarketData() {
     if(status) status.textContent = "Loading GOLD data & All Indicators from Railway...";
 
     try {
-        const BASE = "https://web-production-c3082.up.railway.app";
+        const BASE = window.location.origin;
         const res = await fetch(`${BASE}/api/gold`);
         const data = await res.json();
 
@@ -165,7 +165,7 @@ async function initMarketData() {
         if(status) status.textContent = `✅ GOLD data & Indicators loaded — ${window.candles.length} candles`;
 
         refreshGroups();
-        if (typeof applyIndicators === "function") applyIndicators();
+        if (typeof applyIndicators === "function") await applyIndicators();
 
     } catch (e) {
         console.error("❌ Failed to load candles or indicators:", e);
