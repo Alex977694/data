@@ -425,22 +425,34 @@ function limitFor(type, i) {
     return type === "LONG" ? limits.longLimit : limits.shortLimit;
 }
 
-/* ===== BACKTEST RANGE ===== */
+/* ===== BACKTEST RANGE (Засагдсан хувилбар) ===== */
 function getBacktestRange() {
-    const n = candles.length, all = { start: 0, end: n, count: n, mode: "ALL" };
-    if (!$("addRange").checked) return all;
-    const mode = $("rangeMode").value, day = parseInt($("rangeDay").value, 10);
+    const n = candles.length;
+    
+    // Хэрэв ADD RANGE сонгоогүй эсвэл ямар нэг байдлаар утга олдохгүй бол бүх датаг буцаана
+    if (!document.getElementById("addRange") || !document.getElementById("addRange").checked) {
+        return { start: 0, end: n, count: n, mode: "ALL" };
+    }
+
+    const mode = document.getElementById("rangeMode").value;
+    const day = parseInt(document.getElementById("rangeDay").value, 10) || 1;
+
+    // 1 өдөр = 1440 минут (лаа) гэж үзэхэд
+    const candlesPerDay = 1440;
+    
     if (mode === "last") {
-        const start = Math.max(0, n - MINUTES_PER_DAY * day);
-        return { start, end: n, count: n - start, mode: "LAST", days: day };
+        const countNeeded = candlesPerDay * day;
+        const start = Math.max(0, n - countNeeded);
+        return { start: start, end: n, count: n - start, mode: "LAST", days: day };
     }
+
     if (mode === "block") {
-        const end = n - MINUTES_PER_DAY * (day - 1);
-        const start = Math.max(0, end - MINUTES_PER_DAY);
-        const e = Math.max(0, Math.min(n, end));
-        return { start, end: e, count: Math.max(0, e - start), mode: "DAY", days: day };
+        const end = Math.max(0, n - candlesPerDay * (day - 1));
+        const start = Math.max(0, end - candlesPerDay);
+        return { start: start, end: end, count: end - start, mode: "DAY", days: day };
     }
-    return all;
+
+    return { start: 0, end: n, count: n, mode: "ALL" };
 }
 
 function updateRangeUI() {
