@@ -6,38 +6,37 @@ const $ = id => document.getElementById(id);
 let candles = []; // Глобал candles массив
 
 async function initMarketData() {
+    const status = $("status") || document.getElementById("status");
+    if(status) status.textContent = "Loading GOLD data from Railway...";
+
     try {
-        const res = await fetch("https://web-production-c3082.up.railway.app/candles/GOLD");
+        // /candles/GOLD биш /api/gold энпойнт руу хандах (Учир нь /api/gold нь rsi, macd-тай объект буцаадаг)
+        const res = await fetch("https://web-production-c3082.up.railway.app/api/gold");
         const data = await res.json();
         
         console.log("Raw Railway data:", data);
-        console.log("FIRST CANDLE:", data.candles?.[0]);
-        console.log("SECOND CANDLE:", data.candles?.[1]);
-        console.log("CANDLE LENGTH:", data.candles?.[0]?.length);
 
-        if (data.candles) {
-            candles = data.candles.map(c => ({
-                open_time: c[0],
-                open: c[1],
-                high: c[2],
-                low: c[3],
-                close: c[4],
-                volume: c[5],
-                rsi: c[6],          
-                macd_line: c[7],
-                macd_signal: c[8],
-                macd_histogram: c[9],
-                atr: c[10],
-                bid: c[11],
-                ask: c[12]
-            }));
-            console.log("✅ Candles loaded into Builder:", candles.length);
-            
-            // Дата амжилттай татагдсаны дараа бусад интерфэйс эсвэл бэктест эхлэх бол энд дуудна
-            // buildGroups();
+        if (!data.candles || !Array.isArray(data.candles)) {
+            throw new Error("No candles found in response");
         }
+
+        // Серверээс объект хэлбэрээр ирж байгаа тул шууд онооно
+        window.candles = data.candles;
+        
+        console.log("✅ Candles loaded into Builder:", window.candles.length);
+        if(status) status.textContent = `✅ GOLD data loaded — ${window.candles.length} candles`;
+
+        // Дата амжилттай татагдсаны дараа UI болон индикаторуудыг шинэчлэх
+        if (typeof buildGroups === "function") {
+            buildGroups();
+        }
+        if (typeof applyIndicators === "function") {
+            applyIndicators();
+        }
+
     } catch (e) {
         console.error("❌ Failed to load candles from Railway:", e);
+        if(status) status.textContent = "❌ Failed to load GOLD data: " + e.message;
     }
 }
 
