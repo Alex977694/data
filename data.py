@@ -40,6 +40,7 @@ from arrays import calculate_rsi_array, calculate_macd_arrays
 
 # ==================== CONFIG ====================
 MAX_KLINES = 300  # Лааны түүхэн датаны хязгаар
+MAX_GOLD_CANDLES = 10000
 REST_WORKERS = 10
 WS_PING_INTERVAL = 20
 WS_PING_TIMEOUT = 10
@@ -629,6 +630,7 @@ def receive_gold_candles(data: dict):
     candles = data.get("candles", [])
     ask_price = data.get("ask", 0.0)
     bid_price = data.get("bid", 0.0)
+    full_snapshot = bool(data.get("full_snapshot", True))
     
     if not candles:
         raise HTTPException(status_code=400, detail="Candles data is empty")
@@ -650,9 +652,43 @@ def receive_gold_candles(data: dict):
                     "ask": float(x["ask"]),
                 }
 
+        needs_full_snapshot = False
         with cache_lock:
-            kline_history[symbol] = formatted_candles
-            market_candle_quotes[symbol] = formatted_quotes
+            existing_candles = kline_history.get(symbol, [])
+            existing_quotes = market_candle_quotes.get(symbol, {})
+
+            if full_snapshot or not existing_candles:
+                merged_candles = formatted_candles
+                merged_quotes = formatted_quotes
+                needs_full_snapshot = not full_snapshot and not existing_candles
+            else:
+                merged_candles = list(existing_candles)
+                merged_quotes = dict(existing_quotes)
+                latest_time = int(merged_candles[-1][0]) if merged_candles else None
+
+                for candle in formatted_candles:
+                    candle_time = int(candle[0])
+                    if latest_time is None or candle_time > latest_time:
+                        merged_candles.append(candle)
+                        latest_time = candle_time
+                    elif candle_time == latest_time:
+                        merged_candles[-1] = candle
+                    else:
+                        continue
+
+                    quote = formatted_quotes.get(candle_time)
+                    if quote is not None:
+                        merged_quotes[candle_time] = quote
+
+                overflow = len(merged_candles) - MAX_GOLD_CANDLES
+                if overflow > 0:
+                    removed_times = {int(candle[0]) for candle in merged_candles[:overflow]}
+                    merged_candles = merged_candles[overflow:]
+                    for candle_time in removed_times:
+                        merged_quotes.pop(candle_time, None)
+
+            kline_history[symbol] = merged_candles
+            market_candle_quotes[symbol] = merged_quotes
             market_quotes[symbol] = {
                 "ask": ask_price,
                 "bid": bid_price
@@ -664,7 +700,9 @@ def receive_gold_candles(data: dict):
             "symbol": symbol, 
             "loaded_candles": len(formatted_candles),
             "ask": ask_price,
-            "bid": bid_price
+            "bid": bid_price,
+            "stored_candles": len(kline_history[symbol]),
+            "needs_full_snapshot": needs_full_snapshot
         }
     except Exception as e:
         print(f"[GOLD ERROR] Failed to process gold candles: {e}")
