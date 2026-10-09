@@ -283,6 +283,13 @@ function val(name, i, ctx = {}) {
 
     const candle = data[i];
 
+    const candleField = /^candle_(open|high|low|close)_(\d+)$/.exec(name);
+    if (candleField) {
+        const sourceCandle = data[i - Number(candleField[2])];
+        const fieldValue = sourceCandle?.[candleField[1]];
+        return toNum(fieldValue);
+    }
+
     // 1. Хэрэв шууд лааны объект дотор байвал (жишээ нь: open, close, high, low, volume)
     if (candle[name] !== undefined && candle[name] !== null) {
         const x = Number(candle[name]);
