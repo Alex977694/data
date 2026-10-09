@@ -356,82 +356,84 @@ const getCandles = () =>
 
 window.$ = id => document.getElementById(id);
 
-const MINUTES_PER_DAY=1440;
-const sum=a=>a.reduce((x,y)=>x+y,0);
-const nulls=n=>new Array(n).fill(null);
-const fin=Number.isFinite;
+const MINUTES_PER_DAY = 1440;
+const sum = a => a.reduce((x, y) => x + y, 0);
+const nulls = n => new Array(n).fill(null);
+const fin = Number.isFinite;
 
-function sourceValue(c,s){const x=Number(c[s]);return fin(x)?x:null}
+function sourceValue(c, s) {
+    const x = Number(c[s]);
+    return fin(x) ? x : null;
+}
 
-function applyIndicators(){
- const rp = parseInt($("rsiPeriod").value.trim(), 10);
- const rs = $("rsiSource").value;
+function applyIndicators() {
+    const rp = parseInt($("rsiPeriod").value.trim(), 10);
+    const rs = $("rsiSource").value;
 
- const mf = parseInt($("macdFast").value, 10);
- const ms = parseInt($("macdSlow").value, 10);
- const mg = parseInt($("macdSignal").value, 10);
+    const mf = parseInt($("macdFast").value, 10);
+    const ms = parseInt($("macdSlow").value, 10);
+    const mg = parseInt($("macdSignal").value, 10);
 
- if(!Number.isInteger(rp) || rp < 2)
-   return alert("RSI PERIOD must be 2 or greater.");
+    if (!Number.isInteger(rp) || rp < 2)
+        return alert("RSI PERIOD must be 2 or greater.");
 
- if(!Number.isInteger(mf) || !Number.isInteger(ms) || !Number.isInteger(mg))
-   return alert("MACD settings are invalid.");
+    if (!Number.isInteger(mf) || !Number.isInteger(ms) || !Number.isInteger(mg))
+        return alert("MACD settings are invalid.");
 
- if(ms <= mf)
-   return alert("MACD SLOW must be greater than MACD FAST.");
+    if (ms <= mf)
+        return alert("MACD SLOW must be greater than MACD FAST.");
 
- window.indicatorSettings = window.indicatorSettings || {
-    rsiPeriod: 7,
-    rsiSource: "close",
-    macdFast: 12,
-    macdSlow: 26,
-    macdSignal: 9
- };
+    window.indicatorSettings = window.indicatorSettings || {
+        rsiPeriod: 7,
+        rsiSource: "close",
+        macdFast: 12,
+        macdSlow: 26,
+        macdSignal: 9
+    };
 
- Object.assign(indicatorSettings,{
-   rsiPeriod: rp,
-   rsiSource: rs,
-   macdFast: mf,
-   macdSlow: ms,
-   macdSignal: mg
- });
+    Object.assign(indicatorSettings, {
+        rsiPeriod: rp,
+        rsiSource: rs,
+        macdFast: mf,
+        macdSlow: ms,
+        macdSignal: mg
+    });
 
- if(!Array.isArray(candles) || candles.length === 0){
-    const indicatorStatus = $("indicatorStatus");
-    if(indicatorStatus){
-        indicatorStatus.textContent = "No candle data";
+    if (!Array.isArray(candles) || candles.length === 0) {
+        const indicatorStatus = $("indicatorStatus");
+        if (indicatorStatus) {
+            indicatorStatus.textContent = "No candle data";
+        }
+        return;
     }
-    return;
- }
 
- /* ==========================================
-    UPDATE META CHART DIRECTLY (Серверээс ирсэн объектаар унших)
- ========================================== */
+    /* ==========================================
+       UPDATE META CHART DIRECTLY
+    ========================================== */
 
- window.allData = candles.map(c => [
-   Number(c.open_time),
-   Number(c.open),
-   Number(c.high),
-   Number(c.low),
-   Number(c.close),
-   Number(c.volume)
- ]);
+    window.allData = candles.map(c => [
+        Number(c.open_time),
+        Number(c.open),
+        Number(c.high),
+        Number(c.low),
+        Number(c.close),
+        Number(c.volume)
+    ]);
 
- // Серверээс бэлэн ирж байгаа RSI, MACD утгуудыг шууд холбох
- window.rsiArrayData = candles.map(c => fin(Number(c.rsi)) ? Number(c.rsi) : null);
- window.macdArrayData = candles.map(c => fin(Number(c.macd_line)) ? Number(c.macd_line) : null);
- window.signalArrayData = candles.map(c => fin(Number(c.macd_signal)) ? Number(c.macd_signal) : null);
- window.histArrayData = candles.map(c => fin(Number(c.macd_histogram)) ? Number(c.macd_histogram) : null);
+    window.rsiArrayData = candles.map(c => fin(Number(c.rsi)) ? Number(c.rsi) : null);
+    window.macdArrayData = candles.map(c => fin(Number(c.macd_line)) ? Number(c.macd_line) : null);
+    window.signalArrayData = candles.map(c => fin(Number(c.macd_signal)) ? Number(c.macd_signal) : null);
+    window.histArrayData = candles.map(c => fin(Number(c.macd_histogram)) ? Number(c.macd_histogram) : null);
 
- if(window.redrawChart){
-   window.redrawChart();
- }
+    if (window.redrawChart) {
+        window.redrawChart();
+    }
 
- $("indicatorStatus").textContent =
-   `RSI ${rp} / ${rs.toUpperCase()} | MACD ${mf},${ms},${mg}`;
+    $("indicatorStatus").textContent =
+        `RSI ${rp} / ${rs.toUpperCase()} | MACD ${mf},${ms},${mg}`;
 
- $("dataInfo").textContent =
-   `13 columns | ${candles.length} candles | RSI ${rp} ${rs.toUpperCase()} | MACD ${mf}/${ms}/${mg}`;
+    $("dataInfo").textContent =
+        `13 columns | ${candles.length} candles | RSI ${rp} ${rs.toUpperCase()} | MACD ${mf}/${ms}/${mg}`;
 }
 
  /* ==========================================
