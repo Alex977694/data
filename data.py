@@ -368,7 +368,7 @@ def get_symbol_all_data(symbol: str):
     except Exception as e:
         rsi_res = {"error": str(e)}
 
-    macd_res = calculate_macd_report(klines, symbol)
+    macd_res = calculate_macds(klines, symbol)
     ema13_res = calculate_ema_report(klines, symbol, span=13)
     ema50_res = calculate_ema_report(klines, symbol, span=50)
     ema200_res = calculate_ema_report(klines, symbol, span=200)
@@ -376,8 +376,8 @@ def get_symbol_all_data(symbol: str):
 
     tops_res = None
     try:
-        if symbol in macd_state:
-            init_price = macd_state[symbol].get("macd_initial_up_price")
+        if symbol in calculate_macd_state:
+            init_price = calculate_macd_state[symbol].get("macd_initial_up_price")
             if init_price and init_price > 0:
                 close_price = float(klines[-1][4])
                 change_percent = ((close_price - init_price) / init_price) * 100
@@ -620,10 +620,11 @@ if __name__ == "__main__":
 # ==========================================
 
 market_quotes = {}
+market_candle_quotes = {}
 
 @app.post("/api/gold-update")
 def receive_gold_candles(data: dict):
-    global market_quotes
+    global market_quotes, market_candle_quotes
     symbol = data.get("symbol", "GOLD").upper()
     candles = data.get("candles", [])
     ask_price = data.get("ask", 0.0)
@@ -634,6 +635,7 @@ def receive_gold_candles(data: dict):
 
     try:
         formatted_candles = []
+        formatted_quotes = {}
         for x in candles:
             raw_time = int(x["open_time"])
             t = raw_time * 1000 if raw_time < 10000000000 else raw_time
@@ -642,9 +644,15 @@ def receive_gold_candles(data: dict):
                 t, float(x["open"]), float(x["high"]), 
                 float(x["low"]), float(x["close"]), float(x["volume"]), t
             ])
+            if x.get("bid") is not None and x.get("ask") is not None:
+                formatted_quotes[t] = {
+                    "bid": float(x["bid"]),
+                    "ask": float(x["ask"]),
+                }
 
         with cache_lock:
             kline_history[symbol] = formatted_candles
+            market_candle_quotes[symbol] = formatted_quotes
             market_quotes[symbol] = {
                 "ask": ask_price,
                 "bid": bid_price
@@ -683,6 +691,7 @@ def get_gold_for_backtest():
                 }
             )
         )
+        candle_quotes = dict(market_candle_quotes.get("GOLD", {}))
 
     try:
         macd_data = calculate_macd_arrays(rows)
@@ -698,6 +707,7 @@ def get_gold_for_backtest():
 
         for i, row in enumerate(rows):
             candle_close = float(row[4])
+            candle_quote = candle_quotes.get(int(row[0]), {})
             
             candles.append({
                 "open_time": float(row[0]),
@@ -728,8 +738,8 @@ def get_gold_for_backtest():
                     else None
                 ),
 
-                "bid": candle_close,
-                "ask": candle_close
+                "bid": float(candle_quote.get("bid", candle_close)),
+                "ask": float(candle_quote.get("ask", candle_close))
             })
 
         return {
