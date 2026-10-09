@@ -273,13 +273,19 @@ ADD RANGE
 
 "use strict";
 
-// Ямар ч үед глобал window.candles ашиглана
+"use strict";
+
+// Глобал массив үүсгэх
 window.candles = window.candles || [];
 
-const getCandles = () => 
-    Array.isArray(window.candles) && window.candles.length > 0 
+// getCandles болон candles-ийг window.candles руу холбох
+const getCandles = () => {
+    return Array.isArray(window.candles) && window.candles.length > 0 
         ? window.candles 
-        : (Array.isArray(window.payloadCandles) ? window.payloadCandles : []);
+        : [];
+};
+
+// Туслах хувьсагч байдлаар ашиглах бол getter ашиглах эсвэл шууд window.candles-г дуудах
 
 window.$ = id => document.getElementById(id);
 
