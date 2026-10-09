@@ -751,44 +751,7 @@ function render(count, trades, events, s) {
 }
 
 async function loadInitialData() {
-    const status = $("status");
-    if (status) status.textContent = "Loading GOLD data from Railway...";
-
-    try {
-        const response = await fetch("https://web-production-c3082.up.railway.app/api/gold");
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        
-        const payload = await response.json();
-        if (payload.error) throw new Error(payload.error);
-
-        if (!Array.isArray(payload.candles) || !payload.candles.length) {
-            throw new Error("No GOLD candle data returned.");
-        }
-
-        // Глобал массив руу шууд онооно
-        window.candles = payload.candles;
-
-        console.log("✅ Successfully loaded candles into window.candles:", window.candles.length);
-
-        if (status) {
-            status.textContent = `✅ GOLD data loaded — ${window.candles.length} candles`;
-        }
-
-        const dataInfo = $("dataInfo");
-        if (dataInfo) {
-            dataInfo.textContent = `13 columns | ${window.candles.length} candles`;
-        }
-
-        if (typeof applyIndicators === "function") {
-            applyIndicators();
-        }
-
-    } catch (error) {
-        console.error("INITIAL DATA LOAD ERROR:", error);
-        if (status) {
-            status.textContent = "❌ Failed to load GOLD data: " + error.message;
-        }
-    }
+    await initMarketData();
 }
 
 $("run").onclick = () => {
