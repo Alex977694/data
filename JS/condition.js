@@ -111,6 +111,8 @@ async function initMarketData() {
         let macdDownlimit = null;
         let uplimitCrossLine = null;
         let downlimitCrossLine = null;
+        let completedMacdPeak = { macd_value: 0, price: 0 };
+        let completedMacdTrough = { macd_value: 0, price: 0 };
         const macdInitial = {
             macd_initial_up: null,
             macd_initial_down: null,
@@ -176,12 +178,12 @@ async function initMarketData() {
                 const closedCandle = data.candles[closedIndex];
                 if (priorClosedLine <= 0 && closedLine > 0) {
                     if (macdDownStart !== null) {
-                        lastTrough = {
+                        completedMacdTrough = {
                             macd_value: macdTroughValue,
-                            price: macdTroughPrice,
-                            time: macdTroughTime
+                            price: macdTroughPrice
                         };
                     }
+                    lastTrough = null;
                     macdUpStart = closedIndex;
                     macdPeakValue = closedLine;
                     macdPeakPrice = Number(closedCandle.open);
@@ -194,12 +196,12 @@ async function initMarketData() {
                 }
                 if (priorClosedLine >= 0 && closedLine < 0) {
                     if (macdUpStart !== null) {
-                        lastPeak = {
+                        completedMacdPeak = {
                             macd_value: macdPeakValue,
-                            price: macdPeakPrice,
-                            time: macdPeakTime
+                            price: macdPeakPrice
                         };
                     }
+                    lastPeak = null;
                     macdDownStart = closedIndex;
                     macdTroughValue = closedLine;
                     macdTroughPrice = Number(closedCandle.open);
@@ -211,6 +213,12 @@ async function initMarketData() {
                     macdTroughTime = indicatorTime(closedCandle);
                 }
             }
+            lastPeak = closedLine > 0 && macdUpStart !== null
+                ? { macd_value: macdPeakValue, price: macdPeakPrice, time: macdPeakTime }
+                : null;
+            lastTrough = closedLine < 0 && macdDownStart !== null
+                ? { macd_value: macdTroughValue, price: macdTroughPrice, time: macdTroughTime }
+                : null;
             if (closedIndex > 0 && closedLine !== null && priorClosedLine !== null
                 && closedSignal !== null && priorClosedSignal !== null) {
                 const closedCandle = data.candles[closedIndex];
@@ -336,28 +344,18 @@ async function initMarketData() {
                 indicatorFields.macd_downcross = macdDowncross;
             }
             if (currentLine !== null) {
-                if (closedLine > 0 && macdUpStart !== null) {
-                    indicatorFields["macd_peak.macd_value"] = macdPeakValue;
-                    indicatorFields["macd_peak.price"] = macdPeakPrice;
-                }
-                if (closedLine < 0 && macdDownStart !== null) {
-                    indicatorFields["macd_trough.macd_value"] = macdTroughValue;
-                    indicatorFields["macd_trough.price"] = macdTroughPrice;
-                }
-                if (lastPeak) {
-                    indicatorFields["last_peak.macd_value"] = lastPeak.macd_value;
-                    indicatorFields["last_peak.price"] = lastPeak.price;
-                    indicatorFields["last_peak.time"] = lastPeak.time;
-                }
-                if (lastTrough) {
-                    indicatorFields["last_trough.macd_value"] = lastTrough.macd_value;
-                    indicatorFields["last_trough.price"] = lastTrough.price;
-                    indicatorFields["last_trough.time"] = lastTrough.time;
-                }
+                indicatorFields["macd_peak.macd_value"] = completedMacdPeak.macd_value;
+                indicatorFields["macd_peak.price"] = completedMacdPeak.price;
+                indicatorFields["macd_trough.macd_value"] = completedMacdTrough.macd_value;
+                indicatorFields["macd_trough.price"] = completedMacdTrough.price;
             }
-            indicatorFields.macd_average = lastPeak && lastTrough
-                ? (lastPeak.macd_value + lastTrough.macd_value) / 2
-                : null;
+            indicatorFields["last_peak.macd_value"] = lastPeak?.macd_value ?? null;
+            indicatorFields["last_peak.price"] = lastPeak?.price ?? null;
+            indicatorFields["last_peak.time"] = lastPeak?.time ?? null;
+            indicatorFields["last_trough.macd_value"] = lastTrough?.macd_value ?? null;
+            indicatorFields["last_trough.price"] = lastTrough?.price ?? null;
+            indicatorFields["last_trough.time"] = lastTrough?.time ?? null;
+            indicatorFields.macd_average = (completedMacdPeak.macd_value + completedMacdTrough.macd_value) / 2;
             if (index >= 3) {
                 const previousMacdValues = [];
                 for (let at = Math.max(0, index - 4); at < index; at++) {
