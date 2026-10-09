@@ -20,7 +20,7 @@ function flatten(obj, prefix = "", out = {}) {
 // Backend-ээс шинэ түлхүүр нэмэгдвэл dropdown-д автоматаар орно (нэр нь JSON-ийнхтой ижил)
 function registerKeys(flat, source) {
     Object.entries(flat).forEach(([k, v]) => {
-        if (k === "symbol" || def(k)) return;
+        if (k === "symbol" || Array.isArray(v) || def(k)) return;
         const kind = typeof v === "boolean" ? "bool"
             : /_time$/.test(k) ? "time"
             : (v === null || typeof v === "number" || (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v)))) ? "number"
@@ -61,16 +61,105 @@ async function initMarketData() {
         registerKeys(rsiFlat, "RSI");
         registerKeys(macdFlat, "MACD");
 
-        // JSON-ийн утгууд нь зөвхөн ЭЦСИЙН (live) лаанд хамаарна. Түүхэн лаанд null (хэрэгжихгүй).
         const snapshot = { ...ohlcFlat, ...rsiFlat, ...macdFlat };
         delete snapshot.symbol;
+        delete snapshot.rsi_array;
+        delete snapshot.macd_line_array;
+        delete snapshot.macd_signal_array;
+        delete snapshot.macd_histogram_array;
         const lastIdx = data.candles.length - 1;
-        window.candles = data.candles.map((c, index) => ({
-            ...c,
-            ...(index === lastIdx ? snapshot : {}),
-            bid: Number(c.close),
-            ask: Number(c.close)
-        }));
+        const rsiValues = Array.isArray(rsiRes.rsi_array) ? rsiRes.rsi_array : [];
+        const rsiOffset = data.candles.length - rsiValues.length;
+        const macdSeries = {
+            line: Array.isArray(macdRes.macd_line_array) ? macdRes.macd_line_array : [],
+            signal: Array.isArray(macdRes.macd_signal_array) ? macdRes.macd_signal_array : [],
+            histogram: Array.isArray(macdRes.macd_histogram_array) ? macdRes.macd_histogram_array : []
+        };
+        const macdOffsets = Object.fromEntries(
+            Object.entries(macdSeries).map(([key, series]) => [key, data.candles.length - series.length])
+        );
+        const seriesValue = (series, index, offset) => {
+            const value = series[index - offset];
+            return value === undefined ? null : toNum(value);
+        };
+        let lastRsiStatus = "None";
+        let lastMacdTrend = "None";
+
+        window.candles = data.candles.map((c, index) => {
+            const rsiAt = n => seriesValue(rsiValues, n, rsiOffset);
+            const macdAt = (key, n) => seriesValue(macdSeries[key], n, macdOffsets[key]);
+            const currentRsi = rsiAt(index);
+            const previousRsi = rsiAt(index - 1);
+            const rsiCross = {
+                "30_up": previousRsi !== null && currentRsi !== null && previousRsi <= 30 && currentRsi > 30,
+                "70_up": previousRsi !== null && currentRsi !== null && previousRsi <= 70 && currentRsi > 70,
+                "30_down": previousRsi !== null && currentRsi !== null && previousRsi >= 30 && currentRsi < 30,
+                "70_down": previousRsi !== null && currentRsi !== null && previousRsi >= 70 && currentRsi < 70
+            };
+            const rsiStatus = rsiCross["30_up"] ? "30U"
+                : rsiCross["30_down"] ? "30D"
+                : rsiCross["70_up"] ? "70U"
+                : rsiCross["70_down"] ? "70D" : null;
+            if (rsiStatus) lastRsiStatus = rsiStatus;
+
+            const currentLine = macdAt("line", index);
+            const previousLine = macdAt("line", index - 1);
+            const currentSignal = macdAt("signal", index);
+            const previousSignal = macdAt("signal", index - 1);
+            const macdUpcross = previousLine !== null && previousSignal !== null
+                && currentLine !== null && currentSignal !== null
+                && previousLine <= previousSignal && currentLine > currentSignal;
+            const macdDowncross = previousLine !== null && previousSignal !== null
+                && currentLine !== null && currentSignal !== null
+                && previousLine >= previousSignal && currentLine < currentSignal;
+            if (macdUpcross) lastMacdTrend = "UP";
+            else if (macdDowncross) lastMacdTrend = "DOWN";
+
+            const indicatorFields = {};
+            [0, 1, 2, 3].forEach(offset => {
+                const value = rsiAt(index - offset);
+                if (value !== null) indicatorFields[`rsi${offset}`] = value;
+            });
+            if (currentRsi !== null) indicatorFields.rsi = currentRsi;
+
+            [["30_up", "UP"], ["70_up", "UP"], ["30_down", "DOWN"], ["70_down", "DOWN"]]
+                .forEach(([key, activeValue]) => {
+                    if (previousRsi !== null && currentRsi !== null) {
+                        indicatorFields[key] = rsiCross[key] ? activeValue : "--";
+                    }
+                });
+            if (previousRsi !== null && currentRsi !== null) indicatorFields.last_status = lastRsiStatus;
+
+            const macdNames = { line: "macd_line", signal: "macd_signal", histogram: "macd_histogram" };
+            Object.entries(macdNames).forEach(([key, name]) => {
+                for (let offset = 0; offset < 5; offset++) {
+                    const value = macdAt(key, index - offset);
+                    if (value !== null) {
+                        const prefix = offset === 0 ? "latest" : ["previous", "previous_2", "previous_3", "previous_4"][offset - 1];
+                        indicatorFields[`${prefix}_${name}`] = value;
+                    }
+                }
+            });
+            if (currentLine !== null && currentSignal !== null) {
+                indicatorFields.macd_up = currentLine > currentSignal;
+                indicatorFields.macd_down = currentLine < currentSignal;
+                indicatorFields.macd_line_up = currentLine > 0;
+                indicatorFields.macd_line_down = currentLine < 0;
+                indicatorFields.macd_trend = lastMacdTrend;
+            }
+            if (previousLine !== null && previousSignal !== null && currentLine !== null && currentSignal !== null) {
+                indicatorFields.macd_upcross = macdUpcross;
+                indicatorFields.macd_downcross = macdDowncross;
+            }
+
+            return {
+                ...c,
+                ...(index === lastIdx ? snapshot : {}),
+                ...indicatorFields,
+                bid: Number(c.close),
+                ask: Number(c.close)
+            };
+        });
 
         console.log("✅ Candles + JSON fields loaded:", window.candles.length);
         if(status) status.textContent = `✅ GOLD data & Indicators loaded — ${window.candles.length} candles`;
@@ -292,20 +381,12 @@ function val(name, i, ctx = {}) {
 
     // 1. Хэрэв шууд лааны объект дотор байвал (жишээ нь: open, close, high, low, volume)
     if (candle[name] !== undefined && candle[name] !== null) {
+        if (typeof candle[name] === "boolean") return candle[name];
         const x = Number(candle[name]);
         return Number.isFinite(x) ? x : candle[name];
     }
 
-    // 2. Хэрэв массив индикатор байвал (жишээ нь: rsi_array, macd_line_array г.м)
-    // Хэрэв тухайн лаа өөрөө массивын утга хадгалдаг бол эсвэл глобал массив байвал
-    if (name === "rsi" || name === "rsi1" || name === "rsi0") {
-        // RSI массивиас индексээр нь авах логик
-        if (Array.isArray(window.rsi_array) && window.rsi_array[i] !== undefined) {
-            return Number(window.rsi_array[i]);
-        }
-    }
-
-    // 3. Flatten болсон объект эсвэл бусад шинж чанарууд
+    // 2. Flatten болсон объект эсвэл бусад шинж чанарууд
     const raw = candle[name];
     if (raw !== null && raw !== undefined && raw !== "") {
         const d = def(name);
@@ -596,5 +677,4 @@ function buildGroups() {
  updateModeVisibility("SHORT");
 }
 
-initMarketData();
 buildGroups();
