@@ -164,9 +164,11 @@ def calculate_macd_peaks(klines, fast=12, slow=26, signal=9):
             if active_trough is None or point["macd_value"] < active_trough["macd_value"]:
                 active_trough = point
 
+    latest_closed = float(macd_line.iloc[-2]) if len(macd_line) > 1 else None
+
     return {
-        "macd_peak": find_peak(up_crossings[-1] if up_crossings else None, True),
-        "macd_trough": find_peak(down_crossings[-1] if down_crossings else None, False),
+        "macd_peak": find_peak(up_crossings[-1] if up_crossings else None, True) if latest_closed is not None and latest_closed > 0 else None,
+        "macd_trough": find_peak(down_crossings[-1] if down_crossings else None, False) if latest_closed is not None and latest_closed < 0 else None,
         "last_peak": last_peak,
         "last_trough": last_trough,
     }
