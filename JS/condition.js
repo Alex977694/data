@@ -275,19 +275,38 @@ const dynGet = {
  NOT_MAX_SHORT_REACHED: c => N0(c.shortCount) < Number(maxPositions.SHORT),
 };
 
-// Талбарын нэр = JSON түлхүүр. Утгыг data[i][нэр]-ээс шууд авна (offset байхгүй: rsi0..rsi3, candle_open_0..3 гэх мэт
-// түлхүүрүүд өөрсдөө түүхийг агуулсан). null/хоосон → null (0 биш).
 function val(name, i, ctx = {}) {
     if (dynGet[name]) return dynGet[name](ctx);
-    const d = def(name);
-    if (!d) return null;
+    
     const data = ctx.data || candles;
     if (i < 0 || i >= data.length || !data[i]) return null;
-    const raw = data[i][name];
-    if (raw === null || raw === undefined || raw === "") return null;
-    if (d.kind === "number") return toNum(raw);
-    if (d.kind === "bool") return raw === true || raw === "true" ? true : (raw === false || raw === "false" ? false : null);
-    return String(raw); // text, time (time нь "YYYY-MM-DD HH:MM:SS" тул тэмдэгт мөрөөр харьцуулахад зөв)
+
+    const candle = data[i];
+
+    // 1. Хэрэв шууд лааны объект дотор байвал (жишээ нь: open, close, high, low, volume)
+    if (candle[name] !== undefined && candle[name] !== null) {
+        const x = Number(candle[name]);
+        return Number.isFinite(x) ? x : candle[name];
+    }
+
+    // 2. Хэрэв массив индикатор байвал (жишээ нь: rsi_array, macd_line_array г.м)
+    // Хэрэв тухайн лаа өөрөө массивын утга хадгалдаг бол эсвэл глобал массив байвал
+    if (name === "rsi" || name === "rsi1" || name === "rsi0") {
+        // RSI массивиас индексээр нь авах логик
+        if (Array.isArray(window.rsi_array) && window.rsi_array[i] !== undefined) {
+            return Number(window.rsi_array[i]);
+        }
+    }
+
+    // 3. Flatten болсон объект эсвэл бусад шинж чанарууд
+    const raw = candle[name];
+    if (raw !== null && raw !== undefined && raw !== "") {
+        const d = def(name);
+        if (d && d.kind === "number") return toNum(raw);
+        return raw;
+    }
+
+    return null;
 }
 
 const isUsable = x => x !== null && x !== undefined && !(typeof x === "number" && !Number.isFinite(x));
