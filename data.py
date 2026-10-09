@@ -478,42 +478,41 @@ def get_gold_for_backtest():
         candles = []
 
         for i, row in enumerate(rows):
-            bid = float(quote.get("bid", 0.0))
-            ask = float(quote.get("ask", 0.0))
+            # Лаа бүрийн өөрийнх нь close үнийг bid болон ask болгон ашиглах (ямар нэгэн хиймэл хасалт байхгүй)
+            candle_close = float(row[4])
+            bid = candle_close
+            ask = candle_close
 
             candles.append({
                 "open_time": float(row[0]),
                 "open": float(row[1]),
                 "high": float(row[2]),
                 "low": float(row[3]),
-                "close": float(row[4]),
+                "close": candle_close,
                 "volume": float(row[5]),
 
-                # RSI массив дахь тухайн индекс дэх утгыг оноох
                 "rsi": (
                     float(rsi_array[i])
                     if i < len(rsi_array) and rsi_array[i] is not None
                     else None
                 ),
-
                 "macd_line": (
                     float(macd_line_array[i])
                     if i < len(macd_line_array) and macd_line_array[i] is not None
                     else None
                 ),
-
                 "macd_signal": (
                     float(macd_signal_array[i])
                     if i < len(macd_signal_array) and macd_signal_array[i] is not None
                     else None
                 ),
-
                 "macd_histogram": (
                     float(macd_histogram_array[i])
                     if i < len(macd_histogram_array) and macd_histogram_array[i] is not None
                     else None
                 ),
 
+                # Лаа бүрийн бодит үнээр бичигдэх болно
                 "bid": bid,
                 "ask": ask
             })
