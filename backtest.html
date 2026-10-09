@@ -273,12 +273,13 @@ ADD RANGE
 
 "use strict";
 
-window.candles = [];
+// Ямар ч үед глобал window.candles ашиглана
+window.candles = window.candles || [];
 
-const getCandles = () =>
-    Array.isArray(window.candles)
-        ? window.candles
-        : [];
+const getCandles = () => 
+    Array.isArray(window.candles) && window.candles.length > 0 
+        ? window.candles 
+        : (Array.isArray(window.payloadCandles) ? window.payloadCandles : []);
 
 window.$ = id => document.getElementById(id);
 
