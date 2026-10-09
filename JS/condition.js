@@ -11,7 +11,6 @@ async function initMarketData() {
     if(status) status.textContent = "Loading GOLD data from Railway...";
 
     try {
-        // /candles/GOLD биш /api/gold энпойнт руу хандах (Учир нь /api/gold нь rsi, macd-тай объект буцаадаг)
         const res = await fetch("https://web-production-c3082.up.railway.app/api/gold");
         const data = await res.json();
         
@@ -21,13 +20,23 @@ async function initMarketData() {
             throw new Error("No candles found in response");
         }
 
-        // Серверээс объект хэлбэрээр ирж байгаа тул шууд онооно
-        window.candles = data.candles;
+        // ==========================================
+        // ЭНД ОРУУЛНА (window.candles = data.candles; -ийн оронд)
+        // ==========================================
+        window.candles = data.candles.map(c => {
+            const closePrice = Number(c.close);
+            const spread = 0.25; // Хүссэн spread-ээр солих боломжтой
+            return {
+                ...c,
+                bid: closePrice - spread,
+                ask: closePrice + spread
+            };
+        });
+        // ==========================================
         
         console.log("✅ Candles loaded into Builder:", window.candles.length);
         if(status) status.textContent = `✅ GOLD data loaded — ${window.candles.length} candles`;
 
-        // Дата амжилттай татагдсаны дараа UI болон индикаторуудыг шинэчлэх
         if (typeof buildGroups === "function") {
             buildGroups();
         }
