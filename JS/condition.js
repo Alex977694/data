@@ -81,7 +81,6 @@ const indicatorSettings = {
     macdFast: 12,
     macdSlow: 26,
     macdSignal: 9,
-    atrPeriod: 14
 };
 
 const groups={
@@ -104,7 +103,7 @@ const CFG={
 const fields=[
  ["open_time","OPEN_TIME"],["open","OPEN"],["high","HIGH"],["low","LOW"],
  ["close","CLOSE"],["volume","VOLUME"],["rsi","RSI"],["macd_line","MACD_LINE"],
- ["macd_signal","MACD_SIGNAL"],["macd_histogram","MACD_HISTOGRAM"],["atr","ATR"],["bid","BID"],["ask","ASK"]
+ ["macd_signal","MACD_SIGNAL"],["macd_histogram","MACD_HISTOGRAM"],["bid","BID"],["ask","ASK"]
 ];
 
 const values=[];
@@ -116,8 +115,7 @@ fields.forEach(([field,label])=>{
 [
  "LONG_COUNT","SHORT_COUNT","MAX_LONG_REACHED","MAX_SHORT_REACHED",
  "NOT_MAX_LONG_REACHED","NOT_MAX_SHORT_REACHED","LONG_PNL","SHORT_PNL","TOTAL_FLOATING_PNL",
- "LAST_LONG_PNL","LAST_SHORT_PNL","MAX_LONG_PNL","MAX_SHORT_PNL",
- "PEAK_ATR","GIVEBACK_ATR"
+ "LAST_LONG_PNL","LAST_SHORT_PNL","MAX_LONG_PNL","MAX_SHORT_PNL"
 ].forEach(name=>values.push({name,dynamic:true}));
 
 /* PRESETS: [label,left,op,rightType,right] or {label,conditions} */
@@ -131,8 +129,6 @@ const rsi2=(a,b,n)=>({
 
 const PRESETS=[
  V("OPEN0",">","OPEN1"),V("OPEN0","<","OPEN1"),
- V("CLOSE0",">","OPEN0"),V("CLOSE0","<","OPEN0"),
- V("HIGH0",">","HIGH1"),V("LOW0","<","LOW1"),
 
  P("OPEN0",">","long_limit","LONG_LIMIT"),P("OPEN0","<","long_limit","LONG_LIMIT"),
  P("OPEN0",">","short_limit","SHORT_LIMIT"),P("OPEN0","<","short_limit","SHORT_LIMIT"),
@@ -144,10 +140,7 @@ const PRESETS=[
  V("MACD_HISTOGRAM1",">","MACD_HISTOGRAM2"),V("MACD_HISTOGRAM1","<","MACD_HISTOGRAM2"),
  NUM("MACD_HISTOGRAM1",">"),NUM("MACD_HISTOGRAM1","<"),
  NUM("MACD_LINE1",">"),NUM("MACD_LINE1","<"),
-
- V("CLOSE0",">","CLOSE1"),V("CLOSE0","<","CLOSE1"),
- V("HIGH0",">","HIGH1"),V("HIGH0","<","HIGH1"),
- V("LOW0",">","LOW1"),V("LOW0","<","LOW1"),
+    
  V("VOLUME0",">","VOLUME1"),V("VOLUME0","<","VOLUME1")
 ];
 
@@ -220,8 +213,6 @@ const dynGet={
  MAX_SHORT_REACHED:c=>N0(c.shortCount)>=Number(maxPositions.SHORT),
  NOT_MAX_LONG_REACHED:c=>N0(c.longCount)<Number(maxPositions.LONG),
  NOT_MAX_SHORT_REACHED:c=>N0(c.shortCount)<Number(maxPositions.SHORT),
- PEAK_ATR:c=>c.peakAtr??null,
- GIVEBACK_ATR:c=>c.givebackAtr??null,
 };
 
 function val(name, i, ctx = {}) {
