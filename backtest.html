@@ -726,60 +726,48 @@ function render(count, trades, events, s) {
         : `❌ ACCOUNT BLOWN: ${a.soTime} (свеч #${a.soIndex}) үед margin level ${A.so}%-иас доош орсон. Хамгийн багадаа $${Math.max(0, a.need).toFixed(2)} данс хэрэгтэй байсан.`;
 }
 
-async function loadInitialData(){
+async function loadInitialData() {
     const status = $("status");
-    if(status) status.textContent = "Loading GOLD data from Railway...";
+    if (status) status.textContent = "Loading GOLD data from Railway...";
 
     try {
         const response = await fetch("https://web-production-c3082.up.railway.app/api/gold");
 
-        if(!response.ok){
+        if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
         }
 
         const payload = await response.json();
 
-        if(payload.error){
+        if (payload.error) {
             throw new Error(payload.error);
         }
 
-        if(!Array.isArray(payload.candles) || !payload.candles.length){
+        // Серверээс ирж буй candles массивыг шалгаж авах
+        if (!Array.isArray(payload.candles) || !payload.candles.length) {
             throw new Error("No GOLD candle data returned.");
         }
 
-        // Серверээс ирж буй 객дэг (object) хэлбэрийн candles массивыг шууд авна
-        window.candles = payload.candles.map(c => ({
-            open_time: c.open_time,
-            open: c.open,
-            high: c.high,
-            low: c.low,
-            close: c.close,
-            volume: c.volume,
-            rsi: c.rsi !== null ? Number(c.rsi) : null,
-            macd_line: c.macd_line !== null ? Number(c.macd_line) : null,
-            macd_signal: c.macd_signal !== null ? Number(c.macd_signal) : null,
-            macd_histogram: c.macd_histogram !== null ? Number(c.macd_histogram) : null,
-            bid: c.bid,
-            ask: c.ask
-        }));
+        // Глобал candles хувьсагчид оноох
+        window.candles = payload.candles;
 
-        if(status) {
+        if (status) {
             status.textContent = `✅ GOLD data loaded — ${window.candles.length} candles`;
         }
 
         const dataInfo = $("dataInfo");
-        if(dataInfo) {
+        if (dataInfo) {
             dataInfo.textContent = `13 columns | ${window.candles.length} candles`;
         }
 
-        // Индикаторуудыг болон графикийг шинэчлэх
-        if(typeof applyIndicators === "function") {
+        // Индикатор болон графикийг шинэчлэх функц дуудах
+        if (typeof applyIndicators === "function") {
             applyIndicators();
         }
 
-    } catch(error){
+    } catch (error) {
         console.error("INITIAL DATA LOAD ERROR:", error);
-        if(status) {
+        if (status) {
             status.textContent = "❌ Failed to load GOLD data: " + error.message;
         }
     }
