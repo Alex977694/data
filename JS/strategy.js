@@ -24,39 +24,39 @@ const DEFAULT_TEST_STRATEGY = {
   "conditions": {
     "longOpen": [
       {
-        "left": "MACD_LINE1",
+                "left": "candle_close_0",
         "operator": ">",
         "rightType": "value",
-        "right": "MACD_LINE2",
+                "right": "candle_close_1",
         "logic": "AND"
       }
     ],
     "longReset": [],
     "longExit": [
       {
-        "left": "MACD_LINE1",
+                "left": "candle_close_0",
         "operator": "<",
         "rightType": "value",
-        "right": "MACD_LINE2",
+                "right": "candle_close_1",
         "logic": "AND"
       }
     ],
     "shortOpen": [
       {
-        "left": "MACD_LINE1",
+                "left": "candle_close_0",
         "operator": "<",
         "rightType": "value",
-        "right": "MACD_LINE2",
+                "right": "candle_close_1",
         "logic": "AND"
       }
     ],
     "shortReset": [],
     "shortExit": [
       {
-        "left": "MACD_LINE1",
+                "left": "candle_close_0",
         "operator": ">",
         "rightType": "value",
-        "right": "MACD_LINE2",
+                "right": "candle_close_1",
         "logic": "AND"
       }
     ]
