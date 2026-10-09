@@ -108,16 +108,14 @@ ADD RANGE
         <span>META CHART</span>
 
         <div class="chart-tools">
-
-            <button
-                id="toggleIndicators"
-                class="chart-tool">
-                INDICATORS
-            </button>
-
             <button
                 id="toggleChartSettings"
-                class="chart-tool">
+                class="chart-tool"
+                type="button"
+                title="Chart settings"
+                aria-label="Chart settings"
+                aria-controls="chartSettings"
+                aria-expanded="false">
                 ⚙
             </button>
 
@@ -302,7 +300,7 @@ function sourceValue(c, s) {
 // ==========================================
 // APPLY INDICATORS (Глобал функц болгож зарлав)
 // ==========================================
-window.applyIndicators = function() {
+window.applyIndicators = async function() {
     const rp = parseInt($("rsiPeriod").value.trim(), 10);
     const rs = $("rsiSource").value;
 
@@ -336,71 +334,22 @@ window.applyIndicators = function() {
     });
 
     if (!Array.isArray(candles) || candles.length === 0) {
-        const indicatorStatus = $("indicatorStatus");
-        if (indicatorStatus) {
-            indicatorStatus.textContent = "No candle data";
-        }
+        $("indicatorStatus").textContent = "No candle data";
         return;
     }
 
-    window.allData = candles.map(c => [
-        Number(c.open_time),
-        Number(c.open),
-        Number(c.high),
-        Number(c.low),
-        Number(c.close),
-        Number(c.volume)
-    ]);
-
-    window.rsiArrayData = candles.map(c => fin(Number(c.rsi)) ? Number(c.rsi) : null);
-    window.macdArrayData = candles.map(c => fin(Number(c.macd_line)) ? Number(c.macd_line) : null);
-    window.signalArrayData = candles.map(c => fin(Number(c.macd_signal)) ? Number(c.macd_signal) : null);
-    window.histArrayData = candles.map(c => fin(Number(c.macd_histogram)) ? Number(c.macd_histogram) : null);
-
-    if (window.redrawChart) {
-        window.redrawChart();
+    const status = $("indicatorStatus");
+    if (status) status.textContent = "Updating RSI / MACD...";
+    try {
+        await window.refreshChartIndicators();
+        if (status) status.textContent = `RSI ${rp} / ${rs.toUpperCase()} | MACD ${mf}/${ms}/${mg}`;
+        $("dataInfo").textContent =
+            `13 columns | ${candles.length} candles | RSI ${rp} ${rs.toUpperCase()} | MACD ${mf}/${ms}/${mg}`;
+    } catch (error) {
+        if (status) status.textContent = "Indicator update failed: " + error.message;
+        throw error;
     }
-
-    $("indicatorStatus").textContent =
-        `RSI ${rp} / ${rs.toUpperCase()} | MACD ${mf},${ms},${mg}`;
-
-    $("dataInfo").textContent =
-        `13 columns | ${candles.length} candles | RSI ${rp} ${rs.toUpperCase()} | MACD ${mf}/${ms}/${mg}`;
 };
-
-document.addEventListener("DOMContentLoaded", () => {
-    const indicatorBtn = document.getElementById("toggleIndicators");
-    const settingsBtn = document.getElementById("toggleChartSettings");
-    const settings = document.getElementById("chartSettings");
-
-    if (indicatorBtn) {
-        indicatorBtn.addEventListener("click", () => {
-            const rsi = document.getElementById("showRSI");
-            const macd = document.getElementById("showMACD");
-            if (rsi) rsi.checked = !rsi.checked;
-            if (macd) macd.checked = !macd.checked;
-            if (typeof window.redrawChart === "function") {
-                window.redrawChart();
-            }
-        });
-    }
-
-    if (settingsBtn && settings) {
-        settingsBtn.addEventListener("click", () => {
-            const hidden = settings.style.display === "none" || settings.style.display === "";
-            settings.style.display = hidden ? "block" : "none";
-        });
-    }
-
-    const applyBtn = document.getElementById("applyIndicators");
-    if (applyBtn) {
-        applyBtn.addEventListener("click", () => {
-            if (typeof window.applyIndicators === "function") {
-                window.applyIndicators();
-            }
-        });
-    }
-});
 
 function time(x) {
     let t = Number(x);
@@ -779,7 +728,6 @@ $("run").onclick = () => {
     }
 };
 
-$("applyIndicators").onclick = window.applyIndicators;
 $("addRange").onchange = $("rangeMode").onchange = $("rangeDay").onchange = updateRangeUI;
 updateRangeUI();
 </script>
