@@ -892,3 +892,22 @@ def stop_trade_bot():
             return {"status": "real trade bot already stopped"}
         trade_is_running = False
     return {"status": "real trade bot stop signal sent"}
+
+@app.post("/api/gold-update")
+def receive_gold_candles(data: dict):
+    symbol = data.get("symbol", "GOLD").upper()
+    candles = data.get("candles", [])
+    ask_price = data.get("ask", 0.0)
+    bid_price = data.get("bid", 0.0)
+    
+    if not candles:
+        raise HTTPException(status_code=400, detail="Candles data is empty")
+
+    with cache_lock:
+        kline_history[symbol] = candles
+        market_quotes[symbol] = {
+            "ask": ask_price,
+            "bid": bid_price
+        }
+        
+    return {"status": "success", "loaded_candles": len(candles)}
