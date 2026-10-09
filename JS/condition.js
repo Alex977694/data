@@ -1,67 +1,81 @@
 "use strict";
 
 const $ = id => document.getElementById(id);
+// null/undefined/"" -> null (Number(null) === 0 болохоос сэргийлнэ)
+const toNum = v => (v === null || v === undefined || v === "") ? null : (Number.isFinite(Number(v)) ? Number(v) : null);
 
 // ==================== 1. RAILWAY DATAS & CANDLES ====================
 window.candles = window.candles || [];
+
+// JSON-ийг "эцэг.хүүхэд" түлхүүртэй хавтгай объект болгоно (жишээ: cross_history.s30u)
+function flatten(obj, prefix = "", out = {}) {
+    Object.entries(obj || {}).forEach(([k, v]) => {
+        const key = prefix ? `${prefix}.${k}` : k;
+        if (v && typeof v === "object" && !Array.isArray(v)) flatten(v, key, out);
+        else out[key] = v;
+    });
+    return out;
+}
+
+// Backend-ээс шинэ түлхүүр нэмэгдвэл dropdown-д автоматаар орно (нэр нь JSON-ийнхтой ижил)
+function registerKeys(flat, source) {
+    Object.entries(flat).forEach(([k, v]) => {
+        if (k === "symbol" || def(k)) return;
+        const kind = typeof v === "boolean" ? "bool"
+            : /_time$/.test(k) ? "time"
+            : (v === null || typeof v === "number" || (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v)))) ? "number"
+            : "text";
+        values.push({ name: k, source, kind });
+    });
+}
+
+function refreshGroups() {
+    Object.keys(groups).forEach(t => renderGroup(t));
+}
 
 async function initMarketData() {
     const status = $("status") || document.getElementById("status");
     if(status) status.textContent = "Loading GOLD data & All Indicators from Railway...";
 
     try {
-        const res = await fetch("https://web-production-c3082.up.railway.app/api/gold");
+        const BASE = "https://web-production-c3082.up.railway.app";
+        const res = await fetch(`${BASE}/api/gold`);
         const data = await res.json();
-        
+
         if (!data.candles || !Array.isArray(data.candles)) {
             throw new Error("No candles found in response");
         }
 
         const [rsiRes, macdRes, ohlcRes] = await Promise.all([
-            fetch("https://web-production-c3082.up.railway.app/rsi/GOLD").then(r => r.json()).catch(() => ({})),
-            fetch("https://web-production-c3082.up.railway.app/macd/GOLD").then(r => r.json()).catch(() => ({})),
-            fetch("https://web-production-c3082.up.railway.app/ohlc/GOLD").then(r => r.json()).catch(() => ({}))
+            fetch(`${BASE}/rsi/GOLD`).then(r => r.json()).catch(() => ({})),
+            fetch(`${BASE}/macd/GOLD`).then(r => r.json()).catch(() => ({})),
+            fetch(`${BASE}/ohlc/GOLD`).then(r => r.json()).catch(() => ({}))
         ]);
 
         console.log("RSI Data:", rsiRes);
         console.log("MACD Data:", macdRes);
         console.log("OHLC Data:", ohlcRes);
 
-        window.candles = data.candles.map((c, index) => {
-            return {
-                ...c,
-                // RSI Extended
-                rsi_avg: rsiRes.average_status ?? null,
-                s30u: rsiRes.cross_history?.s30u ?? null,
-                s30d: rsiRes.cross_history?.s30d ?? null,
-                s70u: rsiRes.cross_history?.s70u ?? null,
-                s70d: rsiRes.cross_history?.s70d ?? null,
+        const ohlcFlat = flatten(ohlcRes), rsiFlat = flatten(rsiRes), macdFlat = flatten(macdRes);
+        registerKeys(ohlcFlat, "OHLC");
+        registerKeys(rsiFlat, "RSI");
+        registerKeys(macdFlat, "MACD");
 
-                // MACD Extended
-                macd_line_val: Number(macdRes.latest_macd_line ?? c.macd_line ?? 0),
-                macd_signal_val: Number(macdRes.latest_macd_signal ?? c.macd_signal ?? 0),
-                macd_hist_val: Number(macdRes.latest_macd_histogram ?? c.macd_histogram ?? 0),
-                macd_avg_val: Number(macdRes.macd_average ?? 0),
-                macd_uplimit: Number(macdRes.macd_uplimit ?? 0),
-                macd_downlimit: Number(macdRes.macd_downlimit ?? 0),
-                macd_peak_val: Number(macdRes.macd_peak?.price ?? 0),
-                macd_trough_val: Number(macdRes.macd_trough?.price ?? 0),
+        // JSON-ийн утгууд нь зөвхөн ЭЦСИЙН (live) лаанд хамаарна. Түүхэн лаанд null (хэрэгжихгүй).
+        const snapshot = { ...ohlcFlat, ...rsiFlat, ...macdFlat };
+        delete snapshot.symbol;
+        const lastIdx = data.candles.length - 1;
+        window.candles = data.candles.map((c, index) => ({
+            ...c,
+            ...(index === lastIdx ? snapshot : {}),
+            bid: Number(c.close),
+            ask: Number(c.close)
+        }));
 
-                // OHLC Tracker Extended
-                openup_limit: Number(ohlcRes.openup_limit ?? 0),
-                opendown_limit: Number(ohlcRes.opendown_limit ?? 0),
-                max_high: Number(ohlcRes.max_high ?? 0),
-                min_low: Number(ohlcRes.min_low ?? 0),
-
-                bid: Number(c.close),
-                ask: Number(c.close)
-            };
-        });
-
-        console.log("✅ Fully enriched candles loaded:", window.candles.length);
+        console.log("✅ Candles + JSON fields loaded:", window.candles.length);
         if(status) status.textContent = `✅ GOLD data & Indicators loaded — ${window.candles.length} candles`;
 
-        if (typeof buildGroups === "function") buildGroups();
+        refreshGroups();
         if (typeof applyIndicators === "function") applyIndicators();
 
     } catch (e) {
@@ -94,71 +108,106 @@ const CFG = {
  shortReadyClose:["SHORT READY CLOSE CONDITION","SHORT READY CLOSE","+ ADD READY CLOSE CONDITION"],
 };
 
-/* CANDLE & ADVANCED INDICATOR FIELDS */
-const fields = [
- ["open_time","OPEN_TIME"], ["open","OPEN"], ["high","HIGH"], ["low","LOW"],
- ["close","CLOSE"], ["volume","VOLUME"],
- ["rsi","RSI"], ["rsi_avg","RSI_AVG"],
- ["s30u","RSI_S30U"], ["s30d","RSI_S30D"], ["s70u","RSI_S70U"], ["s70d","RSI_S70D"],
- ["macd_line","MACD_LINE"], ["macd_signal","MACD_SIGNAL"], ["macd_histogram","MACD_HISTOGRAM"],
- ["macd_avg_val","MACD_AVG"], ["macd_uplimit","MACD_UPLIMIT"], ["macd_downlimit","MACD_DOWNLIMIT"],
- ["macd_peak_val","MACD_PEAK"], ["macd_trough_val","MACD_TROUGH"],
- ["openup_limit","OHLC_OPENUP_LIMIT"], ["opendown_limit","OHLC_OPENDOWN_LIMIT"],
- ["max_high","OHLC_MAX_HIGH"], ["min_low","OHLC_MIN_LOW"],
- ["bid","BID"], ["ask","ASK"]
-];
-
+/* ==================== БҮХ ТАЛБАР = 3 JSON-ИЙН ТҮЛХҮҮР (нэр яг ижил) ==================== */
+// Эх сурвалж: /ohlc/GOLD, /rsi/GOLD, /macd/GOLD. Nested түлхүүр нь JSON замаараа: cross_history.s30u, macd_peak.price
+// kind: number | text | bool | time
 const values = [];
-fields.forEach(([field, label]) => {
- [0, -1, -2, -3, -4, -5].forEach((offset) => values.push({ name: label + offset, field, offset }));
-});
+const addKeys = (source, kind, keys) => keys.forEach(name => values.push({ name, source, kind }));
 
-/* DYNAMIC VALUES */
-[
- "LONG_COUNT","SHORT_COUNT","MAX_LONG_REACHED","MAX_SHORT_REACHED",
- "NOT_MAX_LONG_REACHED","NOT_MAX_SHORT_REACHED","LONG_PNL","SHORT_PNL","TOTAL_FLOATING_PNL",
- "LAST_LONG_PNL","LAST_SHORT_PNL","MAX_LONG_PNL","MAX_SHORT_PNL"
-].forEach(name => values.push({ name, dynamic: true }));
+// ---- OHLC ----
+const OHLC_CANDLE_KEYS = [];
+[0, 1, 2, 3].forEach(n => ["open", "high", "low", "close"].forEach(k => OHLC_CANDLE_KEYS.push(`candle_${k}_${n}`)));
+addKeys("OHLC", "number", [...OHLC_CANDLE_KEYS, "min_open", "max_open", "min_close", "max_close", "max_high", "min_low"]);
+addKeys("OHLC", "bool", ["openup", "opendown"]);
+addKeys("OHLC", "number", ["openup_limit", "opendown_limit"]);
+
+// ---- RSI ----
+addKeys("RSI", "number", ["rsi0", "rsi1", "rsi2", "rsi3"]);
+addKeys("RSI", "text", ["30_up", "70_up", "30_down", "70_down"]);
+["s30u", "s30d", "s70u", "s70d"].forEach(s => {
+    values.push({ name: `cross_history.${s}`, source: "RSI", kind: "number" });
+    values.push({ name: `cross_history.${s}_time`, source: "RSI", kind: "time" });
+    values.push({ name: `cross_history.${s}_prev`, source: "RSI", kind: "number" });
+    values.push({ name: `cross_history.${s}_prev_time`, source: "RSI", kind: "time" });
+});
+addKeys("RSI", "text", ["trend"]);
+addKeys("RSI", "number", ["average_status"]);
+addKeys("RSI", "text", ["last_status"]);
+addKeys("RSI", "time", ["last_status_time"]);
+
+// ---- MACD ----
+["macd_line", "macd_signal", "macd_histogram"].forEach(m =>
+    addKeys("MACD", "number", [`latest_${m}`, `previous_${m}`, `previous_2_${m}`, `previous_3_${m}`, `previous_4_${m}`]));
+addKeys("MACD", "bool", ["macd_upcross", "macd_downcross", "macd_line_up", "macd_line_down", "macd_up", "macd_down"]);
+addKeys("MACD", "text", ["macd_trend"]);
+addKeys("MACD", "number", ["macd_min", "macd_max", "macd_average", "macd_uplimit", "macd_downlimit", "uplimit_cross_line", "downlimit_cross_line"]);
+["macd_initial_up", "macd_initial_down", "signal_initial_up", "signal_initial_down"].forEach(p => {
+    values.push({ name: `${p}_price`, source: "MACD", kind: "number" });
+    values.push({ name: `${p}_time`, source: "MACD", kind: "time" });
+});
+addKeys("MACD", "number", ["macd_peak.macd_value", "macd_peak.price", "macd_trough.macd_value", "macd_trough.price"]);
+
+// text талбаруудын мэдэгдэж буй утгууд (right side-д select болж харагдана)
+const ENUMS = {
+    "30_up": ["UP", "--"], "70_up": ["UP", "--"], "30_down": ["DOWN", "--"], "70_down": ["DOWN", "--"],
+    last_status: ["30U", "30D", "70U", "70D", "None"],
+    trend: ["uptrand1", "uptrand2", "downtrand1", "downtrand2", "None"],
+    macd_trend: ["UP", "DOWN", "None"],
+};
+
+/* DYNAMIC VALUES (позицийн төлөв — JSON биш) */
+["LONG_COUNT", "SHORT_COUNT", "LONG_PNL", "SHORT_PNL", "TOTAL_FLOATING_PNL",
+ "LAST_LONG_PNL", "LAST_SHORT_PNL", "MAX_LONG_PNL", "MAX_SHORT_PNL"]
+    .forEach(name => values.push({ name, dynamic: true, source: "POSITION", kind: "number" }));
+["MAX_LONG_REACHED", "MAX_SHORT_REACHED", "NOT_MAX_LONG_REACHED", "NOT_MAX_SHORT_REACHED"]
+    .forEach(name => values.push({ name, dynamic: true, source: "POSITION", kind: "bool" }));
 
 const P = (l,o,t,r) => [`${l} ${o} ${t==="number"?"NUMBER":r}`,l,o,t,r];
 const V = (l,o,r) => P(l,o,"value",r);
 const NUM = (l,o) => P(l,o,"number","");
+const T = (l,o,r) => P(l,o,"text",r);
 const rsi2 = (a,b,n) => ({
- label:`RSI1 ${a} ${n} AND RSI2 ${b} ${n}`,
- conditions:[["RSI1",a,"number",String(n)],["RSI2",b,"number",String(n),"AND"]]
+ label:`rsi1 ${a} ${n} AND rsi2 ${b} ${n}`,
+ conditions:[["rsi1",a,"number",String(n)],["rsi2",b,"number",String(n),"AND"]]
 });
 
 const PRESETS = [
- V("OPEN0",">","OPEN1"), V("OPEN0","<","OPEN1"),
- V("CLOSE0",">","OPEN0"), V("CLOSE0","<","OPEN0"),
- V("HIGH0",">","HIGH1"), V("LOW0","<","LOW1"),
+ V("candle_open_0",">","candle_open_1"), V("candle_open_0","<","candle_open_1"),
+ V("candle_close_0",">","candle_open_0"), V("candle_close_0","<","candle_open_0"),
+ V("candle_high_0",">","candle_high_1"), V("candle_low_0","<","candle_low_1"),
 
- P("OPEN0",">","long_limit","LONG_LIMIT"), P("OPEN0","<","long_limit","LONG_LIMIT"),
- P("OPEN0",">","short_limit","SHORT_LIMIT"), P("OPEN0","<","short_limit","SHORT_LIMIT"),
+ P("candle_open_0",">","long_limit","LONG_LIMIT"), P("candle_open_0","<","long_limit","LONG_LIMIT"),
+ P("candle_open_0",">","short_limit","SHORT_LIMIT"), P("candle_open_0","<","short_limit","SHORT_LIMIT"),
 
- NUM("RSI1",">"), NUM("RSI1","<"), V("RSI1",">","RSI2"), V("RSI1","<","RSI2"),
+ NUM("rsi1",">"), NUM("rsi1","<"), V("rsi1",">","rsi2"), V("rsi1","<","rsi2"),
  rsi2(">","<",30), rsi2("<",">",30), rsi2(">","<",70), rsi2("<",">",70),
+
+ T("last_status","==","30U"), T("last_status","==","70D"),
+ T("30_up","==","UP"), T("70_down","==","DOWN"),
+ T("trend","==","uptrand1"), T("trend","==","downtrand2"),
 
  // Дэвшилтэт холимог нөхцөллүүд (Advanced / Mixed Presets)
  {
-  label: "CLOSE0 > RSI_AVG0 AND RSI1 < 30",
-  conditions: [["CLOSE0", ">", "value", "RSI_AVG0"], ["RSI1", "<", "number", "30", "AND"]]
+  label: "candle_close_0 > average_status AND rsi1 < 30",
+  conditions: [["candle_close_0", ">", "value", "average_status"], ["rsi1", "<", "number", "30", "AND"]]
  },
  {
-  label: "CLOSE0 < RSI_AVG0 AND RSI1 > 70",
-  conditions: [["CLOSE0", "<", "value", "RSI_AVG0"], ["RSI1", ">", "number", "70", "AND"]]
+  label: "candle_close_0 < average_status AND rsi1 > 70",
+  conditions: [["candle_close_0", "<", "value", "average_status"], ["rsi1", ">", "number", "70", "AND"]]
  },
  {
-  label: "CLOSE0 > OHLC_OPENUP_LIMIT0 AND MACD_HISTOGRAM0 > 0",
-  conditions: [["CLOSE0", ">", "value", "OHLC_OPENUP_LIMIT0"], ["MACD_HISTOGRAM0", ">", "number", "0", "AND"]]
+  label: "candle_close_0 > openup_limit AND latest_macd_histogram > 0",
+  conditions: [["candle_close_0", ">", "value", "openup_limit"], ["latest_macd_histogram", ">", "number", "0", "AND"]]
  },
 
- V("MACD_LINE1",">","MACD_SIGNAL1"), V("MACD_LINE1","<","MACD_SIGNAL1"),
- V("MACD_HISTOGRAM1",">","MACD_HISTOGRAM2"), V("MACD_HISTOGRAM1","<","MACD_HISTOGRAM2"),
- NUM("MACD_HISTOGRAM1",">"), NUM("MACD_HISTOGRAM1","<"),
- NUM("MACD_LINE1",">"), NUM("MACD_LINE1","<"),
-    
- V("VOLUME0",">","VOLUME1"), V("VOLUME0","<","VOLUME1")
+ V("previous_macd_line",">","previous_macd_signal"), V("previous_macd_line","<","previous_macd_signal"),
+ V("previous_macd_histogram",">","previous_2_macd_histogram"), V("previous_macd_histogram","<","previous_2_macd_histogram"),
+ NUM("previous_macd_histogram",">"), NUM("previous_macd_histogram","<"),
+ NUM("previous_macd_line",">"), NUM("previous_macd_line","<"),
+
+ T("macd_upcross","==","true"), T("macd_downcross","==","true"),
+ T("macd_up","==","true"), T("macd_down","==","true"),
+ T("macd_trend","==","UP"), T("macd_trend","==","DOWN")
 ];
 
 const condition = () => ({
@@ -226,16 +275,22 @@ const dynGet = {
  NOT_MAX_SHORT_REACHED: c => N0(c.shortCount) < Number(maxPositions.SHORT),
 };
 
+// Талбарын нэр = JSON түлхүүр. Утгыг data[i][нэр]-ээс шууд авна (offset байхгүй: rsi0..rsi3, candle_open_0..3 гэх мэт
+// түлхүүрүүд өөрсдөө түүхийг агуулсан). null/хоосон → null (0 биш).
 function val(name, i, ctx = {}) {
     if (dynGet[name]) return dynGet[name](ctx);
     const d = def(name);
     if (!d) return null;
     const data = ctx.data || candles;
-    const n = i + d.offset;
-    if (n < 0 || n >= data.length) return null;
-    const x = Number(data[n][d.field]);
-    return Number.isFinite(x) ? x : null;
+    if (i < 0 || i >= data.length || !data[i]) return null;
+    const raw = data[i][name];
+    if (raw === null || raw === undefined || raw === "") return null;
+    if (d.kind === "number") return toNum(raw);
+    if (d.kind === "bool") return raw === true || raw === "true" ? true : (raw === false || raw === "false" ? false : null);
+    return String(raw); // text, time (time нь "YYYY-MM-DD HH:MM:SS" тул тэмдэгт мөрөөр харьцуулахад зөв)
 }
+
+const isUsable = x => x !== null && x !== undefined && !(typeof x === "number" && !Number.isFinite(x));
 
 function compare(a, o, b) {
  if (a === null || b === null) return null;
@@ -245,16 +300,18 @@ function compare(a, o, b) {
 function evalCondition(c, i, ctx = {}) {
     if (!c.left) return null;
     if (c.readyClose && ctx.armed === false) return false;
-    if ((c.rightType === "value" || c.rightType === "number") && !c.right) return null;
+    if ((c.rightType === "value" || c.rightType === "number" || c.rightType === "text") && !c.right) return null;
 
+    const kind = def(c.left)?.kind;
     const a = val(c.left, i, ctx);
     const b =
-        c.rightType === "number" ? Number(c.right)
-        : c.rightType === "long_limit" ? Number(ctx.longLimit)
-        : c.rightType === "short_limit" ? Number(ctx.shortLimit)
+        c.rightType === "number" ? toNum(c.right)
+        : c.rightType === "text" ? (kind === "bool" ? (c.right === "true" ? true : c.right === "false" ? false : null) : String(c.right))
+        : c.rightType === "long_limit" ? toNum(ctx.longLimit)
+        : c.rightType === "short_limit" ? toNum(ctx.shortLimit)
         : val(c.right, i, ctx);
 
-    return Number.isFinite(a) && Number.isFinite(b) ? compare(a, c.operator, b) : null;
+    return isUsable(a) && isUsable(b) ? compare(a, c.operator, b) : null;
 }
 
 function evalGroup(list, i, ctx = {}) {
@@ -268,13 +325,48 @@ function evalGroup(list, i, ctx = {}) {
  return r;
 }
 
+function valueOptionsHtml() {
+ const bySource = {};
+ values.forEach(v => (bySource[v.source] = bySource[v.source] || []).push(v));
+ return Object.entries(bySource).map(([src, list]) =>
+  `<optgroup label="${src}">` + list.map(x => `<option value="${x.name}">${x.name}</option>`).join("") + `</optgroup>`
+ ).join("");
+}
+
 function makeSelect(current, placeholder, fn) {
  const s = document.createElement("select");
- s.innerHTML = `<option value="">${placeholder}</option>` +
-  values.map(x => `<option value="${x.name}">${x.name}</option>`).join("");
+ s.innerHTML = `<option value="">${placeholder}</option>` + valueOptionsHtml();
  s.value = current;
  s.onchange = () => fn(s.value);
  return s;
+}
+
+// Зүүн талын талбарын төрөл солигдоход баруун талын төрлийг тохируулна (number ↔ text/bool)
+function onLeftChange(c, v, type) {
+ c.left = v;
+ const k = def(v)?.kind;
+ if (k === "number" && c.rightType === "text") { c.rightType = "number"; c.right = ""; }
+ else if (k && k !== "number" && c.rightType === "number") { c.rightType = "text"; c.right = ""; }
+ renderGroup(type);
+ preview(type);
+}
+
+// TEXT / BOOL баруун тал: bool → true/false, мэдэгдэх enum → select, бусад → text input
+function textControl(c, type) {
+ const kind = def(c.left)?.kind;
+ const opts = kind === "bool" ? ["true", "false"] : ENUMS[c.left];
+ if (opts) {
+  return plainSelect(
+   '<option value="">SELECT</option>' + opts.map(o => `<option value="${o}">${o}</option>`).join(""),
+   c.right || "", v => { c.right = v; preview(type); }
+  );
+ }
+ const inp = document.createElement("input");
+ inp.type = "text";
+ inp.placeholder = kind === "time" ? "YYYY-MM-DD HH:MM:SS" : "TEXT";
+ inp.value = c.right || "";
+ inp.oninput = () => { c.right = inp.value; preview(type); };
+ return inp;
 }
 
 function plainSelect(html, value, fn, cls) {
@@ -304,11 +396,11 @@ function renderGroup(type) {
    c.logic || "AND", v => { c.logic = v; preview(type); }, "condition-logic"
   ));
 
-  r.appendChild(makeSelect(c.left, "LEFT VALUE", v => { c.left = v; preview(type); }));
+  r.appendChild(makeSelect(c.left, "LEFT VALUE", v => onLeftChange(c, v, type)));
   r.appendChild(plainSelect(OPS, c.operator || ">", v => { c.operator = v; preview(type); }));
 
   r.appendChild(plainSelect(
-   '<option value="value">VALUE</option><option value="number">NUMBER</option>' +
+   '<option value="value">VALUE</option><option value="number">NUMBER</option><option value="text">TEXT / BOOL</option>' +
    '<option value="long_limit">LONG LIMIT</option><option value="short_limit">SHORT LIMIT</option>',
    c.rightType || "value",
    v => {
@@ -320,6 +412,8 @@ function renderGroup(type) {
 
   if (c.rightType === "value") {
    r.appendChild(makeSelect(c.right, "RIGHT VALUE", v => { c.right = v; preview(type); }));
+  } else if (c.rightType === "text") {
+   r.appendChild(textControl(c, type));
   } else {
    const inp = document.createElement("input");
    if (c.rightType === "long_limit" || c.rightType === "short_limit") {
@@ -446,7 +540,7 @@ function buildGroups() {
      if (input) {
       const setMax = () => {
        const n = parseInt(input.value, 10);
-       if (Number.isInteger(n) && n >= 1) maxPositions[side] = n;
+       maxPositions[side] = (positionMode[side] === "MANY" && Number.isInteger(n) && n >= 1) ? n : 1;
       };
       input.oninput = setMax;
       setMax();
@@ -462,6 +556,16 @@ function buildGroups() {
   buildAdvancedMenu(type);
  });
 
+ ["LONG", "SHORT"].forEach(side => {
+  const key = side.toLowerCase();
+  const radio = document.querySelector(`input[name="${key}PositionMode"][value="${positionMode[side]}"]`);
+  if (radio) radio.checked = true;
+ });
+ Object.keys(groups).forEach(t => {
+  renderGroup(t);
+  const el = $(t + "Preview");
+  if (el) el.textContent = text(groups[t]);
+ });
  updateModeVisibility("LONG");
  updateModeVisibility("SHORT");
 }
