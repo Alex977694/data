@@ -162,8 +162,11 @@ import traceback
 
 # ==================== RSI ENDPOINT ====================
 @app.get("/rsi/{symbol}")
-def get_symbol_rsi(symbol: str, period: int = 7):
+def get_symbol_rsi(symbol: str, period: int = 7, source: str = "close"):
     symbol = symbol.upper()
+    source_index = {"open": 1, "high": 2, "low": 3, "close": 4}.get(source.lower())
+    if source_index is None:
+        raise HTTPException(status_code=400, detail="RSI source must be open, high, low, or close")
     with cache_lock:
         if symbol not in kline_history:
             raise HTTPException(status_code=404, detail="Symbol not found or not loaded yet")
@@ -171,8 +174,8 @@ def get_symbol_rsi(symbol: str, period: int = 7):
 
     try:
         # RSI массивыг авах (таны эхний код дээр байсан хэсэг)
-        closes = [float(kline[4]) for kline in klines]
-        rsi_series = RSIIndicator(close=pd.Series(closes), window=int(period)).rsi().dropna()
+        source_values = [float(kline[source_index]) for kline in klines]
+        rsi_series = RSIIndicator(close=pd.Series(source_values), window=int(period)).rsi().dropna()
         rsi_arrays = {
             "rsi_array": [float(v) for v in rsi_series.tolist()]
         }
