@@ -336,10 +336,14 @@ async function initMarketData() {
                 indicatorFields.macd_downcross = macdDowncross;
             }
             if (currentLine !== null) {
-                indicatorFields["macd_peak.macd_value"] = macdPeakValue;
-                indicatorFields["macd_peak.price"] = macdPeakPrice;
-                indicatorFields["macd_trough.macd_value"] = macdTroughValue;
-                indicatorFields["macd_trough.price"] = macdTroughPrice;
+                if (closedLine > 0 && macdUpStart !== null) {
+                    indicatorFields["macd_peak.macd_value"] = macdPeakValue;
+                    indicatorFields["macd_peak.price"] = macdPeakPrice;
+                }
+                if (closedLine < 0 && macdDownStart !== null) {
+                    indicatorFields["macd_trough.macd_value"] = macdTroughValue;
+                    indicatorFields["macd_trough.price"] = macdTroughPrice;
+                }
                 if (lastPeak) {
                     indicatorFields["last_peak.macd_value"] = lastPeak.macd_value;
                     indicatorFields["last_peak.price"] = lastPeak.price;
@@ -468,6 +472,13 @@ const ENUMS = {
     macd_trend: ["UP", "DOWN", "None"],
 };
 
+const CONDITION_VALUE_LABELS = {
+    "macd_peak.macd_value": "macd_peak.macd_value (ACTIVE PEAK)",
+    "macd_trough.macd_value": "macd_trough.macd_value (ACTIVE TROUGH)",
+    "last_peak.macd_value": "last_peak.macd_value (CLOSED PEAK)",
+    "last_trough.macd_value": "last_trough.macd_value (CLOSED TROUGH)"
+};
+
 /* DYNAMIC VALUES (позицийн төлөв — JSON биш) */
 ["LONG_COUNT", "SHORT_COUNT", "LONG_PNL", "SHORT_PNL", "TOTAL_FLOATING_PNL",
  "LAST_LONG_PNL", "LAST_SHORT_PNL", "MAX_LONG_PNL", "MAX_SHORT_PNL"]
@@ -517,6 +528,10 @@ const PRESETS = [
  V("previous_macd_histogram",">","previous_2_macd_histogram"), V("previous_macd_histogram","<","previous_2_macd_histogram"),
  NUM("previous_macd_histogram",">"), NUM("previous_macd_histogram","<"),
  NUM("previous_macd_line",">"), NUM("previous_macd_line","<"),
+ V("latest_macd_line",">","macd_peak.macd_value"),
+ V("latest_macd_line","<","macd_trough.macd_value"),
+ V("previous_macd_line",">","last_peak.macd_value"),
+ V("previous_macd_line","<","last_trough.macd_value"),
 
  T("macd_upcross","==","true"), T("macd_downcross","==","true"),
  T("macd_up","==","true"), T("macd_down","==","true"),
@@ -660,7 +675,7 @@ function valueOptionsHtml() {
  const bySource = {};
  values.forEach(v => (bySource[v.source] = bySource[v.source] || []).push(v));
  return Object.entries(bySource).map(([src, list]) =>
-  `<optgroup label="${src}">` + list.map(x => `<option value="${x.name}">${x.name}</option>`).join("") + `</optgroup>`
+    `<optgroup label="${src}">` + list.map(x => `<option value="${x.name}">${CONDITION_VALUE_LABELS[x.name] || x.name}</option>`).join("") + `</optgroup>`
  ).join("");
 }
 
