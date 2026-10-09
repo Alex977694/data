@@ -349,11 +349,7 @@ async function fetchCandles(){
     interval = "1m"; 
     symbol = "GOLD";
     
-    const [candlesRes, rsiRes, arraysRes] = await Promise.all([
-        fetch("/candles/GOLD"),
-        fetch("/rsi/GOLD"),
-        fetch("/arrays/GOLD")
-    ]);
+    const candlesRes = await fetch(`/candles/${symbol}`);
 
     if(!candlesRes.ok) throw new Error(`HTTP ${candlesRes.status}`);
     
@@ -364,17 +360,8 @@ async function fetchCandles(){
         return [Number(d[0]), Number(d[1]), Number(d[2]), Number(d[3]), Number(d[4]), Number(d[5])];
     });
 
-    if(rsiRes.ok) {
-        const rsiJson = await rsiRes.json();
-        window.rsiArrayData = rsiJson.rsi_array || []; 
-    }
-
-    if(arraysRes.ok) {
-        const jsonArrays = await arraysRes.json();
-        window.macdArrayData = jsonArrays.macd_line_array || [];
-        window.signalArrayData = jsonArrays.macd_signal_array || [];
-        window.histArrayData = jsonArrays.macd_histogram_array || [];
-    }
+    await refreshIndicatorArrays(symbol);
+    window._indicatorCandleTime = candles.length ? Number(candles[candles.length - 1][0]) : null;
 
     draw();
     dispatchChartUpdate();
@@ -384,68 +371,55 @@ async function fetchCandles(){
  }catch(e){console.error("[META CHART / FLASK DATA ERROR]",e)}
 }
 
-function startLivePolling(symbol) {
-    setInterval(async () => {
-        try {
-            // Зөвхөн лааны датагаа л хөнгөн татаж авна (RSI, MACD массив бүрийг секунд тутам бүтнээр нь татах шаардлагагүй)
-            const cRes = await fetch(`/candles/${symbol}`);
-            if(cRes.ok) {
-                const cData = await cRes.json();
-                const candles = cData.candles || [];
-                if(candles.length > 0) {
-                    const latestCandle = candles[candles.length - 1];
-                    const lastIdx = window.allData.length - 1;
-                    
-                    // Хэрэв сүүлийн лааны цаг таарч байвал зөвхөн OHLCV утгыг нь шинэчилнэ (бүтэн массивыг дахин шинээр үүсгэхгүй)
-                    if(lastIdx >= 0 && window.allData[lastIdx][0] === Number(latestCandle[0])) {
-                        window.allData[lastIdx] = [
-                            Number(latestCandle[0]),
-                            Number(latestCandle[1]),
-                            Number(latestCandle[2]),
-                            Number(latestCandle[3]),
-                            Number(latestCandle[4]),
-                            Number(latestCandle[5])
-                        ];
-                    } else {
-                        // Цоо шинэ минут эхэлсэн байвал массив руу түлхэж оруулна
-                        window.allData.push([
-                            Number(latestCandle[0]),
-                            Number(latestCandle[1]),
-                            Number(latestCandle[2]),
-                            Number(latestCandle[3]),
-                            Number(latestCandle[4]),
-                            Number(latestCandle[5])
-                        ]);
-                    }
-                    draw();
-                }
-            }
-        } catch(e) {
-            console.error("[LIVE POLLING ERROR]", e);
-        }
-    }, 1000); // 1 секунд тутамд зөвхөн сүүлийн лаагаа шалгана
+async function refreshIndicatorArrays(symbol) {
+    const rsiPeriod = document.getElementById("chartRsiPeriod")?.value || "7";
+    const macdFast = document.getElementById("chartMacdFast")?.value || "12";
+    const macdSlow = document.getElementById("chartMacdSlow")?.value || "26";
+    const macdSignal = document.getElementById("chartMacdSignal")?.value || "9";
+    const [rsiRes, arraysRes] = await Promise.all([
+        fetch(`/rsi/${symbol}?period=${rsiPeriod}`),
+        fetch(`/arrays/${symbol}?fast=${macdFast}&slow=${macdSlow}&signal=${macdSignal}`)
+    ]);
+    if (!rsiRes.ok || !arraysRes.ok) {
+        throw new Error(`Indicator refresh failed (RSI ${rsiRes.status}, MACD ${arraysRes.status})`);
+    }
+
+    const [rsiJson, jsonArrays] = await Promise.all([rsiRes.json(), arraysRes.json()]);
+    window.rsiArrayData = rsiJson.rsi_array || [];
+    window.macdArrayData = jsonArrays.macd_line_array || [];
+    window.signalArrayData = jsonArrays.macd_signal_array || [];
+    window.histArrayData = jsonArrays.macd_histogram_array || [];
 }
 
-// Server-ээс шинэ датаг секунд тутамд татаж график руу шинэчлэх
 function startLivePolling(symbol) {
-    setInterval(async () => {
+    if (window._livePollingTimer) clearInterval(window._livePollingTimer);
+    window._livePollingTimer = setInterval(async () => {
+        if (window._livePollingInFlight) return;
+        window._livePollingInFlight = true;
         try {
             const res = await fetch(`/candles/${symbol}`);
-            if(res.ok) {
-                const data = await res.json();
-                const candles = data.candles || [];
-                if(candles.length > 0) {
-                    window.allData = candles.map(d => [
-                        Number(d[0]), Number(d[1]), Number(d[2]), Number(d[3]), Number(d[4]), Number(d[5])
-                    ]);
-                    // Хэрэв та RSI, MACD массивуудыг мөн live татах бол энд хамт fetch хийж болно
-                    draw(); // Графикийг дахин шинээр зурах
-                }
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+            const data = await res.json();
+            const candles = data.candles || [];
+            if (!candles.length) return;
+
+            window.allData = candles.map(d => [
+                Number(d[0]), Number(d[1]), Number(d[2]), Number(d[3]), Number(d[4]), Number(d[5])
+            ]);
+            const latestCandleTime = Number(candles[candles.length - 1][0]);
+            if (latestCandleTime !== window._indicatorCandleTime) {
+                await refreshIndicatorArrays(symbol);
+                window._indicatorCandleTime = latestCandleTime;
             }
+            draw();
+            dispatchChartUpdate();
         } catch(e) {
             console.error("[LIVE POLLING ERROR]", e);
+        } finally {
+            window._livePollingInFlight = false;
         }
-    }, 1500); // 1.5 секунд тутамд серверээс шинэ дата татна
+    }, 1500);
 }
  
  async function fetchBacktest(){
