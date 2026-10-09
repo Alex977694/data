@@ -893,8 +893,12 @@ def stop_trade_bot():
         trade_is_running = False
     return {"status": "real trade bot stop signal sent"}
 
+# Глобал түвшинд зарлах (Хэрэв байхгүй бол)
+market_quotes = {}
+
 @app.post("/api/gold-update")
 def receive_gold_candles(data: dict):
+    global market_quotes  # <-- Энийг нэмэх
     symbol = data.get("symbol", "GOLD").upper()
     candles = data.get("candles", [])
     ask_price = data.get("ask", 0.0)
@@ -903,11 +907,30 @@ def receive_gold_candles(data: dict):
     if not candles:
         raise HTTPException(status_code=400, detail="Candles data is empty")
 
-    with cache_lock:
-        kline_history[symbol] = candles
-        market_quotes[symbol] = {
+    try:
+        formatted_candles = []
+        for x in candles:
+            # Таны өмнөх форматлах хэсэг...
+            formatted_candles.append([
+                int(x["open_time"]), float(x["open"]), float(x["high"]), 
+                float(x["low"]), float(x["close"]), float(x["volume"]), int(x["open_time"])
+            ])
+
+        with cache_lock:
+            kline_history[symbol] = formatted_candles
+            market_quotes[symbol] = {
+                "ask": ask_price,
+                "bid": bid_price
+            }
+            
+        print(f"[GOLD UPDATE] Successfully loaded {len(formatted_candles)} candles for {symbol} | Ask: {ask_price}, Bid: {bid_price}")
+        return {
+            "status": "success", 
+            "symbol": symbol, 
+            "loaded_candles": len(formatted_candles),
             "ask": ask_price,
             "bid": bid_price
         }
-        
-    return {"status": "success", "loaded_candles": len(candles)}
+    except Exception as e:
+        print(f"[GOLD ERROR] Failed to process gold candles: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
