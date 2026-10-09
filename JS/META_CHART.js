@@ -58,75 +58,29 @@ document.addEventListener("DOMContentLoaded",()=>{
  const marketEl=document.getElementById("market");
  const intervalEl=document.getElementById("interval");
  const coinEl=document.getElementById("coin");
+ const settingsButton=document.getElementById("toggleChartSettings");
+ const settingsPanel=document.getElementById("chartSettings");
+ settingsButton?.addEventListener("click",()=>{
+  const isOpen=settingsPanel.style.display!=="none";
+  settingsPanel.style.display=isOpen?"none":"flex";
+  settingsButton.setAttribute("aria-expanded",String(!isOpen));
+ });
 
- const container = document.getElementById("metaChartContainer");
-    
-    // 1. Графикийн дээр эсвэл дотор байрлах Indicator Control Panel HTML үүсгэх
-    const controlPanel = document.createElement("div");
-    controlPanel.style.cssText = "display: flex; gap: 10px; padding: 10px; background: #1f2937; color: #fff; align-items: center; flex-wrap: wrap; border-bottom: 1px solid #374151;";
-    controlPanel.innerHTML = `
-        <span style="font-weight: bold; font-size: 12px; color: #fbbf24;">INDICATORS:</span>
-        <label>RSI P:</label>
-        <input id="chartRsiPeriod" type="number" value="7" style="width: 50px; background: #374151; color: #fff; border: 1px solid #4b5563; padding: 2px 5px;">
-        
-        <label>Src:</label>
-        <select id="chartRsiSource" style="background: #374151; color: #fff; border: 1px solid #4b5563; padding: 2px 5px;">
-            <option value="open">OPEN</option>
-            <option value="high">HIGH</option>
-            <option value="low">LOW</option>
-            <option value="close" selected>CLOSE</option>
-        </select>
+ ["showRSI","showMACD"].forEach(id=>{
+  document.getElementById(id)?.addEventListener("change",draw);
+ });
 
-        <label>MACD Fast:</label>
-        <input id="chartMacdFast" type="number" value="12" style="width: 50px; background: #374151; color: #fff; border: 1px solid #4b5563; padding: 2px 5px;">
-        
-        <label>Slow:</label>
-        <input id="chartMacdSlow" type="number" value="26" style="width: 50px; background: #374151; color: #fff; border: 1px solid #4b5563; padding: 2px 5px;">
-        
-        <label>Signal:</label>
-        <input id="chartMacdSignal" type="number" value="9" style="width: 50px; background: #374151; color: #fff; border: 1px solid #4b5563; padding: 2px 5px;">
-
-        <button id="chartApplyBtn" style="background: #2563eb; color: #fff; border: none; padding: 4px 12px; cursor: pointer; border-radius: 4px; font-weight: bold;">Apply</button>
-    `;
-
-    // Контейнерийн өмнө эсвэл дотор байрлуулах
-    container.parentNode.insertBefore(controlPanel, container);
-
-    document.getElementById('chartApplyBtn').addEventListener('click', async () => {
-        const rsiPeriod = document.getElementById('chartRsiPeriod').value;
-        const rsiSource = document.getElementById('chartRsiSource').value;
-        const macdFast = document.getElementById('chartMacdFast').value;
-        const macdSlow = document.getElementById('chartMacdSlow').value;
-        const macdSignal = document.getElementById('chartMacdSignal').value;
-    
-        console.log("Applying new settings:", { rsiPeriod, rsiSource, macdFast, macdSlow, macdSignal });
-    
-        try {
-            // Сервер рүү параметрүүдтэйгээ хамт хүсэлт явуулах (FastAPI талд эдгээр query parameter-ийг хүлээж авдаг байх шаардлагатай)
-            const [rsiRes, arraysRes] = await Promise.all([
-                fetch(`/rsi/GOLD?period=${rsiPeriod}&source=${rsiSource}`),
-                fetch(`/arrays/GOLD?fast=${macdFast}&slow=${macdSlow}&signal=${macdSignal}`)
-            ]);
-    
-            if (rsiRes.ok) {
-                const rsiJson = await rsiRes.json();
-                window.rsiArrayData = rsiJson.rsi_array || [];
-            }
-    
-            if (arraysRes.ok) {
-                const jsonArrays = await arraysRes.json();
-                window.macdArrayData = jsonArrays.macd_line_array || [];
-                window.signalArrayData = jsonArrays.macd_signal_array || [];
-                window.histArrayData = jsonArrays.macd_histogram_array || [];
-            }
-    
-            // Шинэ датагаар графикаа шууд дахин зурах
-            draw();
-            console.log("Chart indicators updated successfully!");
-        } catch (e) {
-            console.error("[INDICATOR UPDATE ERROR]", e);
-        }
-    });
+ document.getElementById("applyIndicators")?.addEventListener("click",async event=>{
+  const button=event.currentTarget;
+  button.disabled=true;
+  try{
+   await window.applyIndicators();
+  }catch(error){
+   console.error("[INDICATOR UPDATE ERROR]",error);
+  }finally{
+   button.disabled=false;
+  }
+ });
 
  let symbol="GOLD",interval="1m";
 
@@ -189,13 +143,24 @@ document.addEventListener("DOMContentLoaded",()=>{
   lastPriceRange=maxPrice-minPrice;
   maxPrice+=priceOffset;minPrice+=priceOffset;
 
-  /* Panel-ийн өндрийн харьцаа */
-    /* Panel-ийн өндрийн харьцаа */
-  const R={main:.68,macd:.16,rsi:.16};
-  [["macd",window.macdMode],["rsi",window.rsiMode]].forEach(([k,m])=>{
-   if(m==='max'){Object.assign(R,{main:.2,macd:.2,rsi:.2});R[k]=.4}
-   else if(m==='min'){Object.assign(R,{main:.55,macd:.2,rsi:.2});R[k]=.05}
-  });
+    const showMacd=document.getElementById("showMACD")?.checked!==false;
+    const showRsi=document.getElementById("showRSI")?.checked!==false;
+    const visibleIndicators=Number(showMacd)+Number(showRsi);
+    const R=visibleIndicators===2?{main:.68,macd:.16,rsi:.16}
+     :showMacd?{main:.84,macd:.16,rsi:0}
+     :showRsi?{main:.84,macd:0,rsi:.16}
+     :{main:1,macd:0,rsi:0};
+    [["macd",window.macdMode,showMacd],["rsi",window.rsiMode,showRsi]].forEach(([key,mode,visible])=>{
+     if(!visible)return;
+     const otherVisible=key==="macd"?showRsi:showMacd;
+     if(mode==="max"){
+        Object.assign(R,{main:otherVisible?.2:.4,macd:showMacd?(otherVisible?.2:.6):0,rsi:showRsi?(otherVisible?.2:.6):0});
+        R[key]=otherVisible?.4:.6;
+     }else if(mode==="min"){
+        Object.assign(R,{main:otherVisible?.55:.95,macd:showMacd?(otherVisible?.2:.05):0,rsi:showRsi?(otherVisible?.2:.05):0});
+        R[key]=.05;
+     }
+    });
   const mainRatio=R.main,macdRatio=R.macd,rsiRatio=R.rsi;
 
   const mainChartHeight=chartHeight*mainRatio;
@@ -338,8 +303,8 @@ document.addEventListener("DOMContentLoaded",()=>{
    ["C:",formatPrice(ac[4]),cc]
   ]);
 
-  drawMACD(ctx,data,window.macdArrayData,window.signalArrayData,window.histArrayData,padding,chartWidth,chartHeight,candleWidth,mouse,mainChartHeight,macdRatio);
-  drawRSI(ctx,data,window.rsiArrayData,padding,chartWidth,chartHeight,candleWidth,mouse,mainChartHeight,macdRatio,rsiRatio);
+    if(showMacd)drawMACD(ctx,data,window.macdArrayData,window.signalArrayData,window.histArrayData,padding,chartWidth,chartHeight,candleWidth,mouse,mainChartHeight,macdRatio);
+    if(showRsi)drawRSI(ctx,data,window.rsiArrayData,padding,chartWidth,chartHeight,candleWidth,mouse,mainChartHeight,macdRatio,rsiRatio);
  }
 
  window.redrawChart=draw;
@@ -372,12 +337,13 @@ async function fetchCandles(){
 }
 
 async function refreshIndicatorArrays(symbol) {
-    const rsiPeriod = document.getElementById("chartRsiPeriod")?.value || "7";
-    const macdFast = document.getElementById("chartMacdFast")?.value || "12";
-    const macdSlow = document.getElementById("chartMacdSlow")?.value || "26";
-    const macdSignal = document.getElementById("chartMacdSignal")?.value || "9";
+    const rsiPeriod = document.getElementById("rsiPeriod")?.value || "7";
+    const rsiSource = document.getElementById("rsiSource")?.value || "close";
+    const macdFast = document.getElementById("macdFast")?.value || "12";
+    const macdSlow = document.getElementById("macdSlow")?.value || "26";
+    const macdSignal = document.getElementById("macdSignal")?.value || "9";
     const [rsiRes, arraysRes] = await Promise.all([
-        fetch(`/rsi/${symbol}?period=${rsiPeriod}`),
+        fetch(`/rsi/${symbol}?period=${rsiPeriod}&source=${rsiSource}`),
         fetch(`/arrays/${symbol}?fast=${macdFast}&slow=${macdSlow}&signal=${macdSignal}`)
     ]);
     if (!rsiRes.ok || !arraysRes.ok) {
@@ -390,6 +356,11 @@ async function refreshIndicatorArrays(symbol) {
     window.signalArrayData = jsonArrays.macd_signal_array || [];
     window.histArrayData = jsonArrays.macd_histogram_array || [];
 }
+
+window.refreshChartIndicators = async function(){
+    await refreshIndicatorArrays(symbol);
+    draw();
+};
 
 function startLivePolling(symbol) {
     if (window._livePollingTimer) clearInterval(window._livePollingTimer);
