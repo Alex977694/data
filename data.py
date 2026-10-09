@@ -445,7 +445,6 @@ def get_gold_for_backtest():
 
         rows = list(kline_history["GOLD"])
 
-        # Railway дээр хадгалагдаж байгаа бодит Ask/Bid
         quote = dict(
             market_quotes.get(
                 "GOLD",
@@ -458,39 +457,19 @@ def get_gold_for_backtest():
 
     try:
         # =====================================================
-        # RAILWAY MACD DATA
-        # ЭНД ДАХИН MACD БОДОХГҮЙ
+        # RAILWAY MACD ARRAYS (arrays.py файлын функц)
         # =====================================================
         macd_data = calculate_macd_arrays(rows)
-
-        macd_line_array = macd_data.get(
-            "macd_line_array",
-            []
-        )
-
-        macd_signal_array = macd_data.get(
-            "macd_signal_array",
-            []
-        )
-
-        macd_histogram_array = macd_data.get(
-            "macd_histogram_array",
-            []
-        )
+        macd_line_array = macd_data.get("macd_line_array", [])
+        macd_signal_array = macd_data.get("macd_signal_array", [])
+        macd_histogram_array = macd_data.get("macd_histogram_array", [])
 
         # =====================================================
-        # RAILWAY RSI DATA
-        # ЭНД ДАХИН RSI БОДОХГҮЙ
+        # RAILWAY RSI ARRAYS (arrays.py файлын calculate_rsi_array функцийг ашиглах)
         # =====================================================
-        rsi_data = calculate_rsi_values(
-            rows,
-            window=7
-        )
-
-        rsi_array = rsi_data.get(
-            "rsi_array",
-            rsi_data.get("rsi", [])
-        )
+        # Анхаар: arrays.py дотор calculate_rsi_array байгаа эсэхээ шалгаарай
+        rsi_array_data = calculate_rsi_array(rows, window=7)
+        rsi_array = rsi_array_data.get("rsi_array", [])
 
         # =====================================================
         # CANDLES
@@ -498,9 +477,6 @@ def get_gold_for_backtest():
         candles = []
 
         for i, row in enumerate(rows):
-
-            # Railway дээрх тухайн candle-ийн Ask/Bid биш,
-            # одоогийн market quote-ийг тусад нь өгнө.
             bid = float(quote.get("bid", 0.0))
             ask = float(quote.get("ask", 0.0))
 
@@ -512,40 +488,31 @@ def get_gold_for_backtest():
                 "close": float(row[4]),
                 "volume": float(row[5]),
 
-                # =================================================
-                # RAILWAY INDICATORS
-                # =================================================
+                # RSI массив дахь тухайн индекс дэх утгыг оноох
                 "rsi": (
                     float(rsi_array[i])
-                    if i < len(rsi_array)
-                    and rsi_array[i] is not None
+                    if i < len(rsi_array) and rsi_array[i] is not None
                     else None
                 ),
 
                 "macd_line": (
                     float(macd_line_array[i])
-                    if i < len(macd_line_array)
-                    and macd_line_array[i] is not None
+                    if i < len(macd_line_array) and macd_line_array[i] is not None
                     else None
                 ),
 
                 "macd_signal": (
                     float(macd_signal_array[i])
-                    if i < len(macd_signal_array)
-                    and macd_signal_array[i] is not None
+                    if i < len(macd_signal_array) and macd_signal_array[i] is not None
                     else None
                 ),
 
                 "macd_histogram": (
                     float(macd_histogram_array[i])
-                    if i < len(macd_histogram_array)
-                    and macd_histogram_array[i] is not None
+                    if i < len(macd_histogram_array) and macd_histogram_array[i] is not None
                     else None
                 ),
 
-                # =================================================
-                # REAL MARKET QUOTE FROM MT5 BRIDGE
-                # =================================================
                 "bid": bid,
                 "ask": ask
             })
@@ -554,11 +521,8 @@ def get_gold_for_backtest():
             "symbol": "GOLD",
             "timeframe": "1m",
             "count": len(candles),
-
-            # Одоогийн бодит quote
             "bid": float(quote.get("bid", 0.0)),
             "ask": float(quote.get("ask", 0.0)),
-
             "candles": candles
         }
 
