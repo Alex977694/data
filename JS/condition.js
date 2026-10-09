@@ -3,7 +3,8 @@
 const $ = id => document.getElementById(id);
 
 // ==================== 1. RAILWAY DATAS & CANDLES ====================
-let candles = []; // Глобал candles массив
+// Зөвхөн window.candles л ашиглана, өөр local candles байхгүй!
+window.candles = window.candles || [];
 
 async function initMarketData() {
     const status = $("status") || document.getElementById("status");
