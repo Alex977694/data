@@ -125,9 +125,50 @@ def calculate_macd_peaks(klines, fast=12, slow=26, signal=9):
             "price": float(klines[kline_index][1]) if 0 <= kline_index < len(klines) else 0.0,
         }
 
+    def point_at(index):
+        kline_index = index + offset
+        if not 0 <= kline_index < len(klines):
+            return None
+        return {
+            "macd_value": float(macd_line.iloc[index]),
+            "price": float(klines[kline_index][1]),
+            "time": _format_time_gmt8(klines[kline_index][0]),
+        }
+
+    last_peak = None
+    last_trough = None
+    active_peak = None
+    active_trough = None
+    closed_length = max(0, len(macd_line) - 1)
+
+    for index in range(closed_length):
+        value = float(macd_line.iloc[index])
+        previous = float(macd_line.iloc[index - 1]) if index else 0.0
+
+        if previous > 0 and value < 0:
+            if active_peak is not None:
+                last_peak = active_peak
+            active_peak = None
+            active_trough = point_at(index)
+        elif previous < 0 and value > 0:
+            if active_trough is not None:
+                last_trough = active_trough
+            active_trough = None
+            active_peak = point_at(index)
+        elif value > 0:
+            point = point_at(index)
+            if active_peak is None or point["macd_value"] > active_peak["macd_value"]:
+                active_peak = point
+        elif value < 0:
+            point = point_at(index)
+            if active_trough is None or point["macd_value"] < active_trough["macd_value"]:
+                active_trough = point
+
     return {
         "macd_peak": find_peak(up_crossings[-1] if up_crossings else None, True),
         "macd_trough": find_peak(down_crossings[-1] if down_crossings else None, False),
+        "last_peak": last_peak,
+        "last_trough": last_trough,
     }
 
 
@@ -137,13 +178,19 @@ def calculate_macd_average(klines, fast=12, slow=26, signal=9):
     if len(macd_line) < 4:
         raise ValueError("At least four MACD values are required")
     values = [float(value) for value in macd_line.iloc[-5:-1]]
-    peaks = calculate_macd_peaks(klines, fast, slow, signal)  # <-- Дамжуулж байна
-    peak_value = peaks["macd_peak"]["macd_value"]
-    trough_value = peaks["macd_trough"]["macd_value"]
+    peaks = calculate_macd_peaks(klines, fast, slow, signal)
+    last_peak = peaks["last_peak"]
+    last_trough = peaks["last_trough"]
+    peak_value = last_peak["macd_value"] if last_peak else None
+    trough_value = last_trough["macd_value"] if last_trough else None
     return {
         "macd_min": f"{min(values):.8f}",
         "macd_max": f"{max(values):.8f}",
-        "macd_average": f"{(peak_value + trough_value) / 2.0:.8f}",
+        "macd_average": (
+            f"{(peak_value + trough_value) / 2.0:.8f}"
+            if peak_value is not None and trough_value is not None
+            else None
+        ),
     }
 
 
