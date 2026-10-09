@@ -433,92 +433,6 @@ def backtest_page():
             status_code=404,
             detail="backtest.html файл олдсонгүй!"
         )
-
-@app.get("/api/gold")
-def get_gold_for_backtest():
-    with cache_lock:
-        if "GOLD" not in kline_history:
-            raise HTTPException(
-                status_code=404,
-                detail="GOLD candle data not loaded"
-            )
-
-        rows = list(kline_history["GOLD"])
-
-        quote = dict(
-            market_quotes.get(
-                "GOLD",
-                {
-                    "ask": 0.0,
-                    "bid": 0.0
-                }
-            )
-        )
-
-    try:
-        macd_data = calculate_macd_arrays(rows)
-        macd_line_array = macd_data.get("macd_line_array", [])
-        macd_signal_array = macd_data.get("macd_signal_array", [])
-        macd_histogram_array = macd_data.get("macd_histogram_array", [])
-
-        rsi_array = calculate_rsi_array(rows, window=7)
-        if not isinstance(rsi_array, list):
-            rsi_array = []
-
-        candles = []
-
-        for i, row in enumerate(rows):
-            candle_close = float(row[4])
-            
-            candles.append({
-                "open_time": float(row[0]),
-                "open": float(row[1]),
-                "high": float(row[2]),
-                "low": float(row[3]),
-                "close": candle_close,
-                "volume": float(row[5]),
-
-                "rsi": (
-                    float(rsi_array[i])
-                    if i < len(rsi_array) and rsi_array[i] is not None
-                    else None
-                ),
-                "macd_line": (
-                    float(macd_line_array[i])
-                    if i < len(macd_line_array) and macd_line_array[i] is not None
-                    else None
-                ),
-                "macd_signal": (
-                    float(macd_signal_array[i])
-                    if i < len(macd_signal_array) and macd_signal_array[i] is not None
-                    else None
-                ),
-                "macd_histogram": (
-                    float(macd_histogram_array[i])
-                    if i < len(macd_histogram_array) and macd_histogram_array[i] is not None
-                    else None
-                ),
-
-                # Ямар нэгэн хиймэл spread хасахгүй, ask/bid бодит close үнээр явагдана
-                "bid": candle_close,
-                "ask": candle_close
-            })
-
-        return {
-            "symbol": "GOLD",
-            "timeframe": "1m",
-            "count": len(candles),
-            "bid": float(quote.get("bid", 0.0)),
-            "ask": float(quote.get("ask", 0.0)),
-            "candles": candles
-        }
-
-    except Exception as e:
-        print(f"[GOLD API ERROR] {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
     
 @app.get("/price/{symbol}")
 def get_symbol_live_price(symbol: str):
@@ -701,6 +615,10 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
 
+# ==========================================
+# GOLD DATA ENDPOINTS (Файлын яг хамгийн доор тавина)
+# ==========================================
+
 market_quotes = {}
 
 @app.post("/api/gold-update")
@@ -717,7 +635,6 @@ def receive_gold_candles(data: dict):
     try:
         formatted_candles = []
         for x in candles:
-            # MT5 цаг секундийг миллисекунд болгож жигдлэх (Binance-тай цаг нь зөрөхгүй байх зорилгоор)
             raw_time = int(x["open_time"])
             t = raw_time * 1000 if raw_time < 10000000000 else raw_time
             
@@ -744,3 +661,89 @@ def receive_gold_candles(data: dict):
     except Exception as e:
         print(f"[GOLD ERROR] Failed to process gold candles: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/gold")
+def get_gold_for_backtest():
+    with cache_lock:
+        if "GOLD" not in kline_history:
+            raise HTTPException(
+                status_code=404,
+                detail="GOLD candle data not loaded"
+            )
+
+        rows = list(kline_history["GOLD"])
+
+        quote = dict(
+            market_quotes.get(
+                "GOLD",
+                {
+                    "ask": 0.0,
+                    "bid": 0.0
+                }
+            )
+        )
+
+    try:
+        macd_data = calculate_macd_arrays(rows)
+        macd_line_array = macd_data.get("macd_line_array", [])
+        macd_signal_array = macd_data.get("macd_signal_array", [])
+        macd_histogram_array = macd_data.get("macd_histogram_array", [])
+
+        rsi_array = calculate_rsi_array(rows, window=7)
+        if not isinstance(rsi_array, list):
+            rsi_array = []
+
+        candles = []
+
+        for i, row in enumerate(rows):
+            candle_close = float(row[4])
+            
+            candles.append({
+                "open_time": float(row[0]),
+                "open": float(row[1]),
+                "high": float(row[2]),
+                "low": float(row[3]),
+                "close": candle_close,
+                "volume": float(row[5]),
+
+                "rsi": (
+                    float(rsi_array[i])
+                    if i < len(rsi_array) and rsi_array[i] is not None
+                    else None
+                ),
+                "macd_line": (
+                    float(macd_line_array[i])
+                    if i < len(macd_line_array) and macd_line_array[i] is not None
+                    else None
+                ),
+                "macd_signal": (
+                    float(macd_signal_array[i])
+                    if i < len(macd_signal_array) and macd_signal_array[i] is not None
+                    else None
+                ),
+                "macd_histogram": (
+                    float(macd_histogram_array[i])
+                    if i < len(macd_histogram_array) and macd_histogram_array[i] is not None
+                    else None
+                ),
+
+                "bid": candle_close,
+                "ask": candle_close
+            })
+
+        return {
+            "symbol": "GOLD",
+            "timeframe": "1m",
+            "count": len(candles),
+            "bid": float(quote.get("bid", 0.0)),
+            "ask": float(quote.get("ask", 0.0)),
+            "candles": candles
+        }
+
+    except Exception as e:
+        print(f"[GOLD API ERROR] {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
