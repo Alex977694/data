@@ -156,8 +156,8 @@ async function initMarketData() {
                 ...c,
                 ...(index === lastIdx ? snapshot : {}),
                 ...indicatorFields,
-                bid: Number(c.close),
-                ask: Number(c.close)
+                bid: toNum(c.bid) ?? Number(c.close),
+                ask: toNum(c.ask) ?? Number(c.close)
             };
         });
 
