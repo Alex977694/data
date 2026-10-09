@@ -21,17 +21,9 @@ async function initMarketData() {
         }
 
         // ==========================================
-        // ЭНД ОРУУЛНА (window.candles = data.candles; -ийн оронд)
+        // Ямар нэгэн хиймэл spread хасахгүйгээр шууд Server-ийн Ask/Bid-ийг авна
         // ==========================================
-        window.candles = data.candles.map(c => {
-            const closePrice = Number(c.close);
-            const spread = 0.25; // Хүссэн spread-ээр солих боломжтой
-            return {
-                ...c,
-                bid: closePrice - spread,
-                ask: closePrice + spread
-            };
-        });
+        window.candles = data.candles;
         // ==========================================
         
         console.log("✅ Candles loaded into Builder:", window.candles.length);
