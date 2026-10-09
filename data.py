@@ -465,11 +465,12 @@ def get_gold_for_backtest():
         macd_histogram_array = macd_data.get("macd_histogram_array", [])
 
         # =====================================================
-        # RAILWAY RSI ARRAYS (arrays.py файлын calculate_rsi_array функцийг ашиглах)
+        # RAILWAY RSI ARRAYS
         # =====================================================
-        # Анхаар: arrays.py дотор calculate_rsi_array байгаа эсэхээ шалгаарай
-        rsi_array_data = calculate_rsi_array(rows, window=7)
-        rsi_array = rsi_array_data.get("rsi_array", [])
+        # calculate_rsi_array нь шууд list (жагсаалт) буцаадаг тул .get() хэрэглэхгүй
+        rsi_array = calculate_rsi_array(rows, window=7)
+        if not isinstance(rsi_array, list):
+            rsi_array = [] # Хэрэв өөр форматтай байвал хамгаалах үүднээс
 
         # =====================================================
         # CANDLES
