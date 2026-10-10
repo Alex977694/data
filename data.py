@@ -41,6 +41,7 @@ from arrays import calculate_rsi_array, calculate_macd_arrays
 # ==================== CONFIG ====================
 MAX_KLINES = 300  # Лааны түүхэн датаны хязгаар
 MAX_GOLD_CANDLES = 10000
+DAEMON_MAX_RUNTIME_SECONDS = 30 * 60
 REST_WORKERS = 10
 WS_PING_INTERVAL = 20
 WS_PING_TIMEOUT = 10
@@ -56,6 +57,9 @@ last_kline_time = 0
 daemon_is_running = False
 daemon_thread = None
 daemon_lock = threading.Lock()
+daemon_run_id = 0
+daemon_started_at = None
+daemon_stop_timer = None
 ws_app = None  # WebSocket-г гаднаас нь зогсооход зориулав
 
 selected_symbols = set()
@@ -92,40 +96,78 @@ def get_railway_public_ip():
 # ==================== START / STOP CONTROL ====================
 @app.get("/start")
 def start_daemon():
-    global daemon_is_running, daemon_thread
+    global daemon_is_running, daemon_thread, daemon_run_id, daemon_started_at, daemon_stop_timer
     with daemon_lock:
         if daemon_is_running:
             return {"status": "already running"}
         daemon_is_running = True
+        daemon_run_id += 1
+        run_id = daemon_run_id
+        daemon_started_at = time.time()
+        daemon_stop_timer = threading.Timer(
+            DAEMON_MAX_RUNTIME_SECONDS,
+            _auto_stop_daemon,
+            args=(run_id,),
+        )
+        daemon_stop_timer.daemon = True
         daemon_thread = threading.Thread(target=start_background_daemon, daemon=True)
+        daemon_stop_timer.start()
         daemon_thread.start()
-    return {"status": "daemon started successfully"}
+    return {
+        "status": "daemon started successfully",
+        "auto_stop_seconds": DAEMON_MAX_RUNTIME_SECONDS,
+    }
+
+
+def _stop_daemon(run_id=None):
+    global daemon_is_running, daemon_stop_timer, ws_app
+    with daemon_lock:
+        if run_id is not None and run_id != daemon_run_id:
+            return False
+        if not daemon_is_running:
+            return False
+
+        daemon_is_running = False
+        timer = daemon_stop_timer
+        daemon_stop_timer = None
+        active_ws = ws_app
+        ws_app = None
+
+        if timer is not None and timer is not threading.current_thread():
+            timer.cancel()
+        if active_ws is not None:
+            try:
+                active_ws.close()
+            except Exception:
+                pass
+        return True
+
+
+def _auto_stop_daemon(run_id):
+    if _stop_daemon(run_id):
+        print("[AUTO STOP] Binance daemon reached its 30-minute runtime limit.")
 
 @app.get("/stop")
 def stop_daemon():
-    global daemon_is_running, ws_app
-    with daemon_lock:
-        if not daemon_is_running:
-            return {"status": "already stopped"}
-        daemon_is_running = False
-        
-        # WebSocket ажиллаж байгаа бол шууд хаах
-        if ws_app:
-            try:
-                ws_app.close()
-            except Exception:
-                pass
-                
+    if not _stop_daemon():
+        return {"status": "already stopped"}
     return {"status": "stop signal sent"}
 
 @app.get("/status")
 def daemon_status():
+    with daemon_lock:
+        is_running = daemon_is_running
+        started_at = daemon_started_at
     with cache_lock:
-        return {
-            "is_running": daemon_is_running,
+        result = {
+            "is_running": is_running,
             "symbols_loaded": len(kline_history),
             "closed_candles_count": closed_kline_count
         }
+    if is_running and started_at is not None:
+        elapsed = max(0, int(time.time() - started_at))
+        result["auto_stop_in_seconds"] = max(0, DAEMON_MAX_RUNTIME_SECONDS - elapsed)
+    return result
 
 # ==================== SELECTED SYMBOLS STATE ====================
 
@@ -560,7 +602,7 @@ def start_background_daemon():
     symbols = get_active_symbols()
     if not symbols or not daemon_is_running:
         print("[ERROR] No active symbols found or daemon stopped.")
-        daemon_is_running = False
+        _stop_daemon()
         return
 
     print(f"[SUCCESS] Found {len(symbols)} active symbols.")
@@ -579,6 +621,8 @@ def start_background_daemon():
         
         # Завсарлагыг 0.3 секунд болгож сунгав (Бинансын weight limit-д хэт ачаалал өгөхгүй)
         time.sleep(0.3) 
+        if not daemon_is_running:
+            return symbol, None
         
         res_sym, hist = fetch_historical_klines(client, symbol)
         with progress_lock:
@@ -623,8 +667,89 @@ if __name__ == "__main__":
 # GOLD DATA ENDPOINTS (Файлын яг хамгийн доор тавина)
 # ==========================================
 
+GOLD_MAX_RUNTIME_SECONDS = 30 * 60
+gold_control_lock = threading.Lock()
+gold_is_running = False
+gold_run_id = 0
+gold_started_at = None
+gold_stop_timer = None
+
 market_quotes = {}
 market_candle_quotes = {}
+
+
+def _stop_gold_ingestion(run_id=None):
+    global gold_is_running, gold_stop_timer
+    with gold_control_lock:
+        if run_id is not None and run_id != gold_run_id:
+            return False
+        if not gold_is_running:
+            return False
+
+        gold_is_running = False
+        timer = gold_stop_timer
+        gold_stop_timer = None
+        if timer is not None and timer is not threading.current_thread():
+            timer.cancel()
+        return True
+
+
+def _auto_stop_gold_ingestion(run_id):
+    if _stop_gold_ingestion(run_id):
+        print("[GOLD AUTO STOP] 30-minute ingestion limit reached.")
+
+
+@app.get("/gold/start")
+def start_gold_ingestion():
+    global gold_is_running, gold_run_id, gold_started_at, gold_stop_timer
+    with gold_control_lock:
+        if gold_is_running:
+            elapsed = max(0, int(time.time() - gold_started_at)) if gold_started_at else 0
+            return {
+                "status": "already running",
+                "auto_stop_in_seconds": max(0, GOLD_MAX_RUNTIME_SECONDS - elapsed),
+            }
+
+        gold_is_running = True
+        gold_run_id += 1
+        run_id = gold_run_id
+        gold_started_at = time.time()
+        gold_stop_timer = threading.Timer(
+            GOLD_MAX_RUNTIME_SECONDS,
+            _auto_stop_gold_ingestion,
+            args=(run_id,),
+        )
+        gold_stop_timer.daemon = True
+        gold_stop_timer.start()
+
+    return {
+        "status": "GOLD ingestion started",
+        "run_id": run_id,
+        "auto_stop_seconds": GOLD_MAX_RUNTIME_SECONDS,
+    }
+
+
+@app.get("/gold/stop")
+def stop_gold_ingestion():
+    if not _stop_gold_ingestion():
+        return {"status": "GOLD ingestion already stopped"}
+    return {"status": "GOLD ingestion stopped"}
+
+
+@app.get("/gold/status")
+def gold_ingestion_status():
+    with gold_control_lock:
+        is_running = gold_is_running
+        started_at = gold_started_at
+        run_id = gold_run_id
+    with cache_lock:
+        stored_candles = len(kline_history.get("GOLD", []))
+
+    result = {"is_running": is_running, "run_id": run_id, "stored_candles": stored_candles}
+    if is_running and started_at is not None:
+        elapsed = max(0, int(time.time() - started_at))
+        result["auto_stop_in_seconds"] = max(0, GOLD_MAX_RUNTIME_SECONDS - elapsed)
+    return result
 
 @app.post("/api/gold-update")
 def receive_gold_candles(data: dict):
@@ -634,6 +759,10 @@ def receive_gold_candles(data: dict):
     ask_price = data.get("ask", 0.0)
     bid_price = data.get("bid", 0.0)
     full_snapshot = bool(data.get("full_snapshot", True))
+
+    with gold_control_lock:
+        if not gold_is_running:
+            raise HTTPException(status_code=409, detail="GOLD ingestion is stopped; call /gold/start first")
     
     if not candles:
         raise HTTPException(status_code=400, detail="Candles data is empty")
@@ -656,46 +785,49 @@ def receive_gold_candles(data: dict):
                 }
 
         needs_full_snapshot = False
-        with cache_lock:
-            existing_candles = kline_history.get(symbol, [])
-            existing_quotes = market_candle_quotes.get(symbol, {})
+        with gold_control_lock:
+            if not gold_is_running:
+                raise HTTPException(status_code=409, detail="GOLD ingestion stopped before this update was stored")
+            with cache_lock:
+                existing_candles = kline_history.get(symbol, [])
+                existing_quotes = market_candle_quotes.get(symbol, {})
 
-            if full_snapshot or not existing_candles:
-                merged_candles = formatted_candles
-                merged_quotes = formatted_quotes
-                needs_full_snapshot = not full_snapshot and not existing_candles
-            else:
-                merged_candles = list(existing_candles)
-                merged_quotes = dict(existing_quotes)
-                latest_time = int(merged_candles[-1][0]) if merged_candles else None
+                if full_snapshot or not existing_candles:
+                    merged_candles = formatted_candles
+                    merged_quotes = formatted_quotes
+                    needs_full_snapshot = not full_snapshot and not existing_candles
+                else:
+                    merged_candles = list(existing_candles)
+                    merged_quotes = dict(existing_quotes)
+                    latest_time = int(merged_candles[-1][0]) if merged_candles else None
 
-                for candle in formatted_candles:
-                    candle_time = int(candle[0])
-                    if latest_time is None or candle_time > latest_time:
-                        merged_candles.append(candle)
-                        latest_time = candle_time
-                    elif candle_time == latest_time:
-                        merged_candles[-1] = candle
-                    else:
-                        continue
+                    for candle in formatted_candles:
+                        candle_time = int(candle[0])
+                        if latest_time is None or candle_time > latest_time:
+                            merged_candles.append(candle)
+                            latest_time = candle_time
+                        elif candle_time == latest_time:
+                            merged_candles[-1] = candle
+                        else:
+                            continue
 
-                    quote = formatted_quotes.get(candle_time)
-                    if quote is not None:
-                        merged_quotes[candle_time] = quote
+                        quote = formatted_quotes.get(candle_time)
+                        if quote is not None:
+                            merged_quotes[candle_time] = quote
 
-                overflow = len(merged_candles) - MAX_GOLD_CANDLES
-                if overflow > 0:
-                    removed_times = {int(candle[0]) for candle in merged_candles[:overflow]}
-                    merged_candles = merged_candles[overflow:]
-                    for candle_time in removed_times:
-                        merged_quotes.pop(candle_time, None)
+                    overflow = len(merged_candles) - MAX_GOLD_CANDLES
+                    if overflow > 0:
+                        removed_times = {int(candle[0]) for candle in merged_candles[:overflow]}
+                        merged_candles = merged_candles[overflow:]
+                        for candle_time in removed_times:
+                            merged_quotes.pop(candle_time, None)
 
-            kline_history[symbol] = merged_candles
-            market_candle_quotes[symbol] = merged_quotes
-            market_quotes[symbol] = {
-                "ask": ask_price,
-                "bid": bid_price
-            }
+                kline_history[symbol] = merged_candles
+                market_candle_quotes[symbol] = merged_quotes
+                market_quotes[symbol] = {
+                    "ask": ask_price,
+                    "bid": bid_price
+                }
             
         print(f"[GOLD UPDATE] Successfully loaded {len(formatted_candles)} candles for {symbol} | Ask: {ask_price}, Bid: {bid_price}")
         return {
