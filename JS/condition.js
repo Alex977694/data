@@ -887,7 +887,11 @@ function buildGroups() {
   const s = document.createElement("div");
   s.className = "section";
   s.innerHTML = `
-   <div class="section-title">${title}</div>
+    <div class="section-title section-heading">
+     <span>${title}</span>
+     <button type="button" id="${type}Collapse" class="section-collapse-toggle" aria-controls="${type}Content" aria-expanded="false" title="Expand ${title.toLowerCase()}">+</button>
+    </div>
+    <div id="${type}Content" class="section-collapse-content" hidden>
    ${modeHtml}
    <div id="${type}Box"></div>
    <div class="advanced-wrap">
@@ -896,8 +900,19 @@ function buildGroups() {
    </div>
    <button type="button" id="${type}Add">${CFG[type][2]}</button>
    <button type="button" id="${type}Prev">PREVIEW</button>
-   <div id="${type}Preview" class="preview ${/Exit|Reset|ReadyClose/.test(type) ? "exit" : ""}">No conditions</div>`;
+    <div id="${type}Preview" class="preview ${/Exit|Reset|ReadyClose/.test(type) ? "exit" : ""}">No conditions</div>
+    </div>`;
   root.appendChild(s);
+
+  const collapseButton = $(type + "Collapse");
+  collapseButton.onclick = () => {
+    const content = $(type + "Content");
+    const expand = content.hidden;
+    content.hidden = !expand;
+    collapseButton.textContent = expand ? "−" : "+";
+    collapseButton.setAttribute("aria-expanded", String(expand));
+    collapseButton.title = `${expand ? "Collapse" : "Expand"} ${title.toLowerCase()}`;
+  };
 
   if (isOpen) {
    document.querySelectorAll(`input[name="${key}PositionMode"]`).forEach(radio => {
