@@ -73,6 +73,7 @@ function buildStrategyJSON(){
         strategy_name: "GOLD 1M Hedge Strategy",
         positionMode: { LONG: positionMode.LONG, SHORT: positionMode.SHORT },
         maxPositions: { LONG: Number(maxPositions.LONG), SHORT: Number(maxPositions.SHORT) },
+        limitTrail: { LONG: limitTrailEnabled.LONG, SHORT: limitTrailEnabled.SHORT },
         indicators: {
             rsiPeriod: Number(indicatorSettings.rsiPeriod),
             rsiSource: indicatorSettings.rsiSource,
@@ -87,11 +88,13 @@ function buildStrategyJSON(){
             longReset: groups.longReset.map(serializeCondition),
             longExit: groups.longExit.map(serializeCondition),
             longReadyClose: groups.longReadyClose.map(serializeCondition),
+            longLimitTrail: groups.longLimitTrail.map(serializeCondition),
 
             shortOpen: groups.shortOpen.map(serializeCondition),
             shortReset: groups.shortReset.map(serializeCondition),
             shortExit: groups.shortExit.map(serializeCondition),
-            shortReadyClose: groups.shortReadyClose.map(serializeCondition)
+            shortReadyClose: groups.shortReadyClose.map(serializeCondition),
+            shortLimitTrail: groups.shortLimitTrail.map(serializeCondition)
         }
     };
 }
@@ -147,6 +150,9 @@ function loadStrategyJSON(data){
         }
     }
 
+    limitTrailEnabled.LONG = !!data.limitTrail?.LONG;
+    limitTrailEnabled.SHORT = !!data.limitTrail?.SHORT;
+
     /* INDICATORS */
     if(data.indicators){
         const x = data.indicators;
@@ -182,10 +188,12 @@ function loadStrategyJSON(data){
         "longReset",
         "longExit",
         "longReadyClose",
+        "longLimitTrail",
         "shortOpen",
         "shortReset",
         "shortExit",
-        "shortReadyClose"
+        "shortReadyClose",
+        "shortLimitTrail"
     ];
 
     conditionGroups.forEach(type => {
@@ -254,6 +262,12 @@ function loadStrategyJSON(data){
 
     updateModeVisibility("LONG");
     updateModeVisibility("SHORT");
+    ["LONG", "SHORT"].forEach(side => {
+        const key = side.toLowerCase();
+        const toggle = $(key + "LimitTrailEnabled");
+        if(toggle) toggle.checked = limitTrailEnabled[side];
+        updateLimitTrailVisibility(side);
+    });
 
     applyIndicators();
     refreshStrategyJSON();
