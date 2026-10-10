@@ -269,8 +269,10 @@ button:disabled:hover{border-color:var(--line2);color:var(--text);background:var
 .limit-trail-controls{margin-top:7px}
 .limit-trail-panel{margin:7px 0 2px;padding:8px;background:#0b1017;border:1px solid var(--line);border-radius:6px}
 .limit-trail-panel .section-title{margin-bottom:5px;font-size:9px}
+.limit-trail-panel .limit-trail-update-title{margin-top:12px;padding-top:8px;border-top:1px solid var(--line2)}
 .limit-trail-panel .condition-box{max-height:220px}
 .limit-trail-panel>button{margin:6px 5px 0 0}
+.limit-trail-reset-toggle{margin:8px 0 0}
 
 /* ========================= META CHART ========================= */
 #metaChartContainer{
