@@ -399,6 +399,7 @@ async function initMarketData() {
 
 const positionMode = { LONG: "SINGLE", SHORT: "SINGLE" };
 const maxPositions = { LONG: 1, SHORT: 1 };
+const limitTrailEnabled = { LONG: false, SHORT: false };
 
 const indicatorSettings = {
     rsiPeriod: 7, rsiSource: "close",
@@ -407,7 +408,8 @@ const indicatorSettings = {
 
 const groups = {
  longOpen:[], longReset:[], longExit:[], longReadyClose:[],
- shortOpen:[], shortReset:[], shortExit:[], shortReadyClose:[]
+ shortOpen:[], shortReset:[], shortExit:[], shortReadyClose:[],
+ longLimitTrail:[], shortLimitTrail:[]
 };
 
 const CFG = {
@@ -417,6 +419,8 @@ const CFG = {
  shortOpen:["SHORT OPEN CONDITION","SHORT OPEN","+ ADD CONDITION"],
  shortReset:["SHORT RESET CONDITION","SHORT RESET","+ ADD RESET CONDITION"],
  shortExit:["SHORT EXIT CONDITION","SHORT EXIT","+ ADD EXIT CONDITION"],
+ longLimitTrail:["LONG LIMIT TRAIL CONDITION","LONG LIMIT TRAIL","+ ADD TRAIL CONDITION"],
+ shortLimitTrail:["SHORT LIMIT TRAIL CONDITION","SHORT LIMIT TRAIL","+ ADD TRAIL CONDITION"],
  longReadyClose:["LONG READY CLOSE CONDITION","LONG READY CLOSE","+ ADD READY CLOSE CONDITION"],
  shortReadyClose:["SHORT READY CLOSE CONDITION","SHORT READY CLOSE","+ ADD READY CLOSE CONDITION"],
 };
@@ -832,6 +836,12 @@ function updateModeVisibility(side) {
  }
 }
 
+function updateLimitTrailVisibility(side) {
+ const key = side.toLowerCase();
+ const panel = $(key + "LimitTrailPanel");
+ if (panel) panel.style.display = limitTrailEnabled[side] ? "" : "none";
+}
+
 function buildGroups() {
  const root = $("groups");
  root.innerHTML = "";
@@ -849,7 +859,7 @@ function buildGroups() {
   const key = side.toLowerCase();
   const isOpen = type === "longOpen" || type === "shortOpen";
 
-  const modeHtml = isOpen ? `
+    const modeHtml = isOpen ? `
    <div class="row"><div class="position-mode-row">
     <span class="position-mode-label">${side} POSITION MODE</span>
     <label class="position-option"><input type="radio" name="${key}PositionMode" value="SINGLE" checked> SINGLE POS</label>
@@ -858,7 +868,21 @@ function buildGroups() {
      <label>MAX POS</label>
      <input id="${key}MaxPos" type="number" min="1" step="1" value="10">
     </span>
-   </div></div>` : "";
+    </div></div>
+    <div class="limit-trail-controls">
+     <label class="range-toggle"><input id="${key}LimitTrailEnabled" type="checkbox"> TRAIL ${side} LIMIT</label>
+     <div id="${key}LimitTrailPanel" class="limit-trail-panel" style="display:none">
+      <div class="section-title">${side} LIMIT TRAIL CONDITION</div>
+      <div id="${key}LimitTrailBox"></div>
+      <div class="advanced-wrap">
+        <button type="button" id="${key}LimitTrailAdvanced">ADVANCED CONDITIONS ▼</button>
+        <div id="${key}LimitTrailAdvancedMenu" class="advanced-menu"></div>
+      </div>
+      <button type="button" id="${key}LimitTrailAdd">+ ADD TRAIL CONDITION</button>
+      <button type="button" id="${key}LimitTrailPrev">PREVIEW</button>
+      <div id="${key}LimitTrailPreview" class="preview">No conditions</div>
+     </div>
+    </div>` : "";
 
   const s = document.createElement("div");
   s.className = "section";
@@ -892,6 +916,20 @@ function buildGroups() {
      updateModeVisibility(side);
     };
    });
+
+    const trailType = key + "LimitTrail";
+    const trailToggle = $(key + "LimitTrailEnabled");
+    trailToggle.checked = limitTrailEnabled[side];
+    trailToggle.onchange = () => {
+     limitTrailEnabled[side] = trailToggle.checked;
+     updateLimitTrailVisibility(side);
+     autoJSON();
+    };
+    $(trailType + "Advanced").onclick = () => toggleAdvanced(trailType);
+    $(trailType + "Add").onclick = () => add(trailType);
+    $(trailType + "Prev").onclick = () => preview(trailType);
+    buildAdvancedMenu(trailType);
+    updateLimitTrailVisibility(side);
   }
 
   $(type + "Advanced").onclick = () => toggleAdvanced(type);
