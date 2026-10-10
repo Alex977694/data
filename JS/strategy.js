@@ -84,6 +84,7 @@ function buildStrategyJSON(){
         positionMode: { LONG: positionMode.LONG, SHORT: positionMode.SHORT },
         maxPositions: { LONG: Number(maxPositions.LONG), SHORT: Number(maxPositions.SHORT) },
         limitTrail: { LONG: limitTrailEnabled.LONG, SHORT: limitTrailEnabled.SHORT },
+        limitTrailReset: { LONG: limitTrailReset.LONG, SHORT: limitTrailReset.SHORT },
         indicators: {
             rsiPeriod: Number(indicatorSettings.rsiPeriod),
             rsiSource: indicatorSettings.rsiSource,
@@ -98,12 +99,14 @@ function buildStrategyJSON(){
             longReset: groups.longReset.map(serializeCondition),
             longExit: groups.longExit.map(serializeCondition),
             longReadyClose: groups.longReadyClose.map(serializeCondition),
+            longLimitTrailArm: groups.longLimitTrailArm.map(serializeCondition),
             longLimitTrail: groups.longLimitTrail.map(serializeCondition),
 
             shortOpen: groups.shortOpen.map(serializeCondition),
             shortReset: groups.shortReset.map(serializeCondition),
             shortExit: groups.shortExit.map(serializeCondition),
             shortReadyClose: groups.shortReadyClose.map(serializeCondition),
+            shortLimitTrailArm: groups.shortLimitTrailArm.map(serializeCondition),
             shortLimitTrail: groups.shortLimitTrail.map(serializeCondition)
         }
     };
@@ -162,6 +165,8 @@ function loadStrategyJSON(data){
 
     limitTrailEnabled.LONG = !!data.limitTrail?.LONG;
     limitTrailEnabled.SHORT = !!data.limitTrail?.SHORT;
+    limitTrailReset.LONG = !!data.limitTrailReset?.LONG;
+    limitTrailReset.SHORT = !!data.limitTrailReset?.SHORT;
 
     /* INDICATORS */
     if(data.indicators){
@@ -198,11 +203,13 @@ function loadStrategyJSON(data){
         "longReset",
         "longExit",
         "longReadyClose",
+        "longLimitTrailArm",
         "longLimitTrail",
         "shortOpen",
         "shortReset",
         "shortExit",
         "shortReadyClose",
+        "shortLimitTrailArm",
         "shortLimitTrail"
     ];
 
@@ -276,6 +283,8 @@ function loadStrategyJSON(data){
         const key = side.toLowerCase();
         const toggle = $(key + "LimitTrailEnabled");
         if(toggle) toggle.checked = limitTrailEnabled[side];
+        const resetToggle = $(key + "LimitTrailReset");
+        if(resetToggle) resetToggle.checked = limitTrailReset[side];
         updateLimitTrailVisibility(side);
     });
 
