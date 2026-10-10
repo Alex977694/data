@@ -400,6 +400,7 @@ async function initMarketData() {
 const positionMode = { LONG: "SINGLE", SHORT: "SINGLE" };
 const maxPositions = { LONG: 1, SHORT: 1 };
 const limitTrailEnabled = { LONG: false, SHORT: false };
+const limitTrailReset = { LONG: false, SHORT: false };
 
 const indicatorSettings = {
     rsiPeriod: 7, rsiSource: "close",
@@ -409,7 +410,8 @@ const indicatorSettings = {
 const groups = {
  longOpen:[], longReset:[], longExit:[], longReadyClose:[],
  shortOpen:[], shortReset:[], shortExit:[], shortReadyClose:[],
- longLimitTrail:[], shortLimitTrail:[]
+ longLimitTrailArm:[], longLimitTrail:[],
+ shortLimitTrailArm:[], shortLimitTrail:[]
 };
 
 const CFG = {
@@ -419,7 +421,9 @@ const CFG = {
  shortOpen:["SHORT OPEN CONDITION","SHORT OPEN","+ ADD CONDITION"],
  shortReset:["SHORT RESET CONDITION","SHORT RESET","+ ADD RESET CONDITION"],
  shortExit:["SHORT EXIT CONDITION","SHORT EXIT","+ ADD EXIT CONDITION"],
+ longLimitTrailArm:["LONG LIMIT TRAIL ARM CONDITION","LONG LIMIT TRAIL ARM","+ ADD ARM CONDITION"],
  longLimitTrail:["LONG LIMIT TRAIL CONDITION","LONG LIMIT TRAIL","+ ADD TRAIL CONDITION"],
+ shortLimitTrailArm:["SHORT LIMIT TRAIL ARM CONDITION","SHORT LIMIT TRAIL ARM","+ ADD ARM CONDITION"],
  shortLimitTrail:["SHORT LIMIT TRAIL CONDITION","SHORT LIMIT TRAIL","+ ADD TRAIL CONDITION"],
  longReadyClose:["LONG READY CLOSE CONDITION","LONG READY CLOSE","+ ADD READY CLOSE CONDITION"],
  shortReadyClose:["SHORT READY CLOSE CONDITION","SHORT READY CLOSE","+ ADD READY CLOSE CONDITION"],
@@ -872,7 +876,17 @@ function buildGroups() {
     <div class="limit-trail-controls">
      <label class="range-toggle"><input id="${key}LimitTrailEnabled" type="checkbox"> TRAIL ${side} LIMIT</label>
      <div id="${key}LimitTrailPanel" class="limit-trail-panel" style="display:none">
-      <div class="section-title">${side} LIMIT TRAIL CONDITION</div>
+            <div class="section-title">${side} ARM CONDITION</div>
+            <div id="${key}LimitTrailArmBox"></div>
+            <div class="advanced-wrap">
+                <button type="button" id="${key}LimitTrailArmAdvanced">ADVANCED ARM CONDITIONS ▼</button>
+                <div id="${key}LimitTrailArmAdvancedMenu" class="advanced-menu"></div>
+            </div>
+            <button type="button" id="${key}LimitTrailArmAdd">+ ADD ARM CONDITION</button>
+            <button type="button" id="${key}LimitTrailArmPrev">PREVIEW ARM</button>
+            <div id="${key}LimitTrailArmPreview" class="preview">No conditions</div>
+
+            <div class="section-title limit-trail-update-title">${side} LIMIT UPDATE CONDITION</div>
       <div id="${key}LimitTrailBox"></div>
       <div class="advanced-wrap">
         <button type="button" id="${key}LimitTrailAdvanced">ADVANCED CONDITIONS ▼</button>
@@ -881,6 +895,7 @@ function buildGroups() {
       <button type="button" id="${key}LimitTrailAdd">+ ADD TRAIL CONDITION</button>
       <button type="button" id="${key}LimitTrailPrev">PREVIEW</button>
       <div id="${key}LimitTrailPreview" class="preview">No conditions</div>
+    <label class="range-toggle limit-trail-reset-toggle"><input id="${key}LimitTrailReset" type="checkbox"> WITH LIMIT RESET</label>
      </div>
     </div>` : "";
 
@@ -932,14 +947,25 @@ function buildGroups() {
     };
    });
 
+    const trailArmType = key + "LimitTrailArm";
     const trailType = key + "LimitTrail";
     const trailToggle = $(key + "LimitTrailEnabled");
+    const trailReset = $(key + "LimitTrailReset");
     trailToggle.checked = limitTrailEnabled[side];
+    trailReset.checked = limitTrailReset[side];
     trailToggle.onchange = () => {
      limitTrailEnabled[side] = trailToggle.checked;
      updateLimitTrailVisibility(side);
      autoJSON();
     };
+    trailReset.onchange = () => {
+     limitTrailReset[side] = trailReset.checked;
+     autoJSON();
+    };
+    $(trailArmType + "Advanced").onclick = () => toggleAdvanced(trailArmType);
+    $(trailArmType + "Add").onclick = () => add(trailArmType);
+    $(trailArmType + "Prev").onclick = () => preview(trailArmType);
+    buildAdvancedMenu(trailArmType);
     $(trailType + "Advanced").onclick = () => toggleAdvanced(trailType);
     $(trailType + "Add").onclick = () => add(trailType);
     $(trailType + "Prev").onclick = () => preview(trailType);
