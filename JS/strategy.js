@@ -63,6 +63,16 @@ const DEFAULT_TEST_STRATEGY = {
   }
 };
 
+document.getElementById("strategySettingsCollapse").onclick = event => {
+    const button = event.currentTarget;
+    const content = document.getElementById("strategySettingsContent");
+    const expand = content.hidden;
+    content.hidden = !expand;
+    button.textContent = expand ? "−" : "+";
+    button.setAttribute("aria-expanded", String(expand));
+    button.title = `${expand ? "Collapse" : "Expand"} strategy save and load`;
+};
+
 function serializeCondition(c){
     return { left: c.left, operator: c.operator, rightType: c.rightType, right: c.right, logic: c.logic || "AND", readyClose: !!c.readyClose };
 }
