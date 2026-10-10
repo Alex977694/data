@@ -469,8 +469,14 @@ function runBacktest() {
         const ep = Number(type === "LONG" ? c.ask : c.bid);
         const et = time(c.open_time);
         const limit = limitFor(type, i);
+        const trailEnabled = limitTrailEnabled[type];
+        const hasArmCondition = groups[type.toLowerCase() + "LimitTrailArm"].length > 0;
 
-        positions[type].push({ id: Date.now() + Math.random(), type, entryTime: et, entryPrice: ep, limit, peak: 0 });
+        positions[type].push({
+            id: Date.now() + Math.random(), type, entryTime: et, entryPrice: ep, limit, peak: 0,
+            limitTrailArmed: trailEnabled && !hasArmCondition,
+            limitTrailArmedAt: i
+        });
         events.push({ time: et, price: ep, limit, action: type + " OPEN" });
         count[type].open++;
         count[type].trades++;
@@ -496,6 +502,7 @@ function runBacktest() {
             reset: groups[k + "Reset"],
             rc: groups[k + "ReadyClose"],
             exit: groups[k + "Exit"],
+            limitTrailArm: groups[k + "LimitTrailArm"],
             limitTrail: groups[k + "LimitTrail"]
         };
     });
@@ -524,6 +531,19 @@ function runBacktest() {
         specs.forEach(s => {
             if (!limitTrailEnabled[s.type] || !s.limitTrail.length) return;
             positions[s.type].forEach(position => {
+                if (!position.limitTrailArmed) {
+                    if (!s.limitTrailArm.length || evalGroup(s.limitTrailArm, dataIndex, {
+                        ...dyn,
+                        longLimit: s.type === "LONG" ? position.limit : null,
+                        shortLimit: s.type === "SHORT" ? position.limit : null
+                    }) === true) {
+                        position.limitTrailArmed = true;
+                        position.limitTrailArmedAt = dataIndex;
+                    }
+                    return;
+                }
+                if (dataIndex <= position.limitTrailArmedAt) return;
+
                 const trailCtx = {
                     ...dyn,
                     longLimit: s.type === "LONG" ? position.limit : null,
@@ -536,8 +556,14 @@ function runBacktest() {
                 if (position.limit === null || position.limit === undefined
                     || (s.type === "LONG" && nextLimit > position.limit)
                     || (s.type === "SHORT" && nextLimit < position.limit)) {
+                    const previousLimit = position.limit;
                     position.limit = nextLimit;
                     position.limitTrailTime = time(c.open_time);
+                    events.push({ time: position.limitTrailTime, price: nextLimit, limit: previousLimit, action: s.type + " LIMIT TRAIL" });
+                    if (limitTrailReset[s.type]) {
+                        position.limitTrailArmed = false;
+                        position.limitTrailArmedAt = dataIndex;
+                    }
                 }
             });
         });
