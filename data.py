@@ -670,9 +670,99 @@ if __name__ == "__main__":
 market_quotes = {}
 market_candle_quotes = {}
 
+# ==================== GOLD DAEMON CONTROL STATE ====================
+# Gold датаг зөвхөн "/gold/start" тушаалын дараа хүлээж авна.
+# "/gold/stop" эсвэл 30 минутын автомат зогсоолтын дараа "/api/gold-update"
+# руу ирэх датаг хүлээж авахгүй тул Railway серверийн RAM ихээхгүй байна.
+gold_is_running = False
+gold_lock = threading.Lock()
+gold_run_id = 0
+gold_started_at = None
+gold_stop_timer = None
+
+
+# ==================== GOLD START / STOP CONTROL ====================
+@app.get("/gold/start")
+def gold_start_daemon():
+    global gold_is_running, gold_run_id, gold_started_at, gold_stop_timer
+    with gold_lock:
+        if gold_is_running:
+            return {"status": "gold already running"}
+        gold_is_running = True
+        gold_run_id += 1
+        run_id = gold_run_id
+        gold_started_at = time.time()
+        gold_stop_timer = threading.Timer(
+            DAEMON_MAX_RUNTIME_SECONDS,
+            _gold_auto_stop,
+            args=(run_id,),
+        )
+        gold_stop_timer.daemon = True
+        gold_stop_timer.start()
+    return {
+        "status": "gold daemon started successfully",
+        "auto_stop_seconds": DAEMON_MAX_RUNTIME_SECONDS,
+    }
+
+
+def _gold_stop(run_id=None):
+    global gold_is_running, gold_stop_timer
+    with gold_lock:
+        if run_id is not None and run_id != gold_run_id:
+            return False
+        if not gold_is_running:
+            return False
+        gold_is_running = False
+        timer = gold_stop_timer
+        gold_stop_timer = None
+        if timer is not None and timer is not threading.current_thread():
+            timer.cancel()
+        return True
+
+
+def _gold_auto_stop(run_id):
+    if _gold_stop(run_id):
+        print("[GOLD AUTO STOP] Gold daemon reached its 30-minute runtime limit.")
+
+
+@app.get("/gold/stop")
+def gold_stop_daemon():
+    if not _gold_stop():
+        return {"status": "gold already stopped"}
+    return {"status": "gold stop signal sent"}
+
+
+@app.get("/gold/status")
+def gold_status():
+    with gold_lock:
+        is_running = gold_is_running
+        started_at = gold_started_at
+    with cache_lock:
+        gold_candles = len(kline_history.get("GOLD", []))
+    result = {
+        "is_running": is_running,
+        "gold_candles_stored": gold_candles,
+        "max_gold_candles": MAX_GOLD_CANDLES,
+    }
+    if is_running and started_at is not None:
+        elapsed = max(0, int(time.time() - started_at))
+        result["auto_stop_in_seconds"] = max(0, DAEMON_MAX_RUNTIME_SECONDS - elapsed)
+    return result
+
 @app.post("/api/gold-update")
 def receive_gold_candles(data: dict):
     global market_quotes, market_candle_quotes
+
+    # Gold daemon ажиллаагүй бол сервер RAM ихээхгүй байхын тулд датаг хүлээж авахгүй.
+    # mt5_bridge "/gold/start" хийхгүй бол 503 хариу авч, дата цуглуулалт зогсоно.
+    with gold_lock:
+        gold_active = gold_is_running
+    if not gold_active:
+        raise HTTPException(
+            status_code=503,
+            detail="Gold daemon is not running. Call /gold/start first."
+        )
+
     symbol = data.get("symbol", "GOLD").upper()
     candles = data.get("candles", [])
     ask_price = data.get("ask", 0.0)
