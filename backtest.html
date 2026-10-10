@@ -485,7 +485,14 @@ function runBacktest() {
 
     const specs = ["LONG", "SHORT"].map(type => {
         const k = type.toLowerCase();
-        return { type, open: groups[k + "Open"], reset: groups[k + "Reset"], rc: groups[k + "ReadyClose"], exit: groups[k + "Exit"] };
+        return {
+            type,
+            open: groups[k + "Open"],
+            reset: groups[k + "Reset"],
+            rc: groups[k + "ReadyClose"],
+            exit: groups[k + "Exit"],
+            limitTrail: groups[k + "LimitTrail"]
+        };
     });
 
     activeCandles.forEach((c, i) => {
@@ -508,6 +515,27 @@ function runBacktest() {
             notMaxLongReached: lp.length < Number(maxPositions.LONG),
             notMaxShortReached: sp.length < Number(maxPositions.SHORT)
         };
+
+        specs.forEach(s => {
+            if (!limitTrailEnabled[s.type] || !s.limitTrail.length) return;
+            positions[s.type].forEach(position => {
+                const trailCtx = {
+                    ...dyn,
+                    longLimit: s.type === "LONG" ? position.limit : null,
+                    shortLimit: s.type === "SHORT" ? position.limit : null
+                };
+                if (evalGroup(s.limitTrail, dataIndex, trailCtx) !== true) return;
+
+                const nextLimit = limitFor(s.type, dataIndex);
+                if (!Number.isFinite(nextLimit)) return;
+                if (position.limit === null || position.limit === undefined
+                    || (s.type === "LONG" && nextLimit > position.limit)
+                    || (s.type === "SHORT" && nextLimit < position.limit)) {
+                    position.limit = nextLimit;
+                    position.limitTrailTime = time(c.open_time);
+                }
+            });
+        });
 
         specs.forEach(s => {
             if (positionMode[s.type] === "MANY" && s.reset.length && evalGroup(s.reset, dataIndex, {}) === true) {
