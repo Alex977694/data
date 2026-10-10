@@ -13,7 +13,11 @@
 
 <!-- STRATEGY SAVE / LOAD -->
 <div class="section">
-<div class="section-title">STRATEGY SAVE / LOAD</div>
+<div class="section-title section-heading">
+<span>STRATEGY SAVE / LOAD</span>
+<button id="strategySettingsCollapse" class="section-collapse-toggle" type="button" aria-controls="strategySettingsContent" aria-expanded="false" title="Expand strategy save and load">+</button>
+</div>
+<div id="strategySettingsContent" class="section-collapse-content" hidden>
 <div class="strategy-tools">
 <button id="copyStrategy">COPY JSON</button>
 <button id="pasteStrategy">PASTE JSON</button>
@@ -23,6 +27,7 @@
 <input id="strategyFile" type="file" accept=".json,application/json" style="display:none">
 </div>
 <textarea id="strategyJson" class="strategy-json" spellcheck="false" placeholder="Strategy JSON энд харагдана. JSON paste хийгээд IMPORT JSON дарж болно."></textarea>
+</div>
 </div>
 
 <div id="groups"></div>
