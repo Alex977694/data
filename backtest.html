@@ -113,6 +113,12 @@ ADD RANGE
         <span>META CHART</span>
 
         <div class="chart-tools">
+            <label class="chart-interval-label" for="interval" title="Candle interval">TIME:</label>
+            <select id="interval" class="chart-interval-select" title="Candle interval">
+                <option value="1m" selected>1m</option>
+                <option value="5m">5m</option>
+                <option value="15m">15m</option>
+            </select>
             <button
                 id="toggleChartSettings"
                 class="chart-tool"
@@ -800,6 +806,16 @@ window.addEventListener("DOMContentLoaded", async () => {
         buildGroups();
         loadStrategyJSON(DEFAULT_TEST_STRATEGY);
         await loadInitialData();
+
+        // Interval (1m/5m/15m) солигдоход бүх дата + индикаторууд шинэ интервал дээр дахин ачааллагдана.
+        // (META_CHART.js өөрөө chart-ийг шинэчилнэ; энд window.candles + snapshot-ийг дахин бүтээж
+        //  backtest-ийн нөхцөлүүд зөв интервал дээр ажиллах болгож байна.)
+        const intervalEl = document.getElementById("interval");
+        if (intervalEl) {
+            intervalEl.addEventListener("change", () => {
+                loadInitialData();
+            });
+        }
     } catch (error) {
         console.error("INITIALIZATION ERROR:", error);
         const status = document.getElementById("status");
