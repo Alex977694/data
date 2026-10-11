@@ -47,6 +47,44 @@ WS_PING_INTERVAL = 20
 WS_PING_TIMEOUT = 10
 WS_URL = "wss://fstream.binance.com/market/stream"
 
+# ==================== GOLD INTERVAL AGGREGATION ====================
+# Chart/backtest дээр сонгож болох интервал (минут). 1m = өгөгдмөл (aggregate хийхгүй).
+ALLOWED_GOLD_INTERVALS = {1, 5, 15}
+
+
+def aggregate_candles(klines, interval_min):
+    """1m candle rows-г interval_min минут интервал болгон aggregate хийнэ.
+
+    Row формат: [open_time_ms, open, high, low, close, volume, close_time_ms]
+    Aggregate дүрэм: O=анхны open, H=max(high), L=min(low), C=сүүлийн close, V=volume нийлбэр.
+    Таймштамп нь интервалын ЭХЛЭЛ (UTC-д зөв хил拉斯ан) болно.
+    """
+    if interval_min <= 1 or not klines:
+        return klines
+
+    bucket_ms = interval_min * 60 * 1000
+    buckets = {}
+    order = []
+    for k in klines:
+        t = int(k[0])
+        bucket = t - (t % bucket_ms)  # интервалын эхлэл (өмнө хилласан)
+        existing = buckets.get(bucket)
+        if existing is None:
+            buckets[bucket] = [
+                bucket, float(k[1]), float(k[2]), float(k[3]),
+                float(k[4]), float(k[5]), int(k[6]),
+            ]
+            order.append(bucket)
+        else:
+            if float(k[2]) > existing[2]:
+                existing[2] = float(k[2])
+            if float(k[3]) < existing[3]:
+                existing[3] = float(k[3])
+            existing[4] = float(k[4])          # сүүлийн close
+            existing[5] += float(k[5])          # volume нийлбэр
+            existing[6] = int(k[6])             # сүүлийн close_time
+    return [buckets[b] for b in order]
+
 # ==================== STATE ====================
 kline_history = {}
 cache_lock = threading.Lock()
@@ -204,7 +242,7 @@ import traceback
 
 # ==================== RSI ENDPOINT ====================
 @app.get("/rsi/{symbol}")
-def get_symbol_rsi(symbol: str, period: int = 7, source: str = "close"):
+def get_symbol_rsi(symbol: str, period: int = 7, source: str = "close", interval: int = 1):
     symbol = symbol.upper()
     source_index = {"open": 1, "high": 2, "low": 3, "close": 4}.get(source.lower())
     if source_index is None:
@@ -213,6 +251,8 @@ def get_symbol_rsi(symbol: str, period: int = 7, source: str = "close"):
         if symbol not in kline_history:
             raise HTTPException(status_code=404, detail="Symbol not found or not loaded yet")
         klines = kline_history[symbol]
+
+    klines = aggregate_candles(klines, interval)
 
     try:
         # RSI массивыг авах (таны эхний код дээр байсан хэсэг)
@@ -248,16 +288,17 @@ def get_symbol_rsi(symbol: str, period: int = 7, source: str = "close"):
 # ==================== ARRAYS (MACD) ENDPOINT ====================
 @app.get("/arrays/{symbol}")
 def get_arrays_endpoint(
-    symbol: str, 
-    fast: int = Query(12), 
-    slow: int = Query(26), 
-    signal: int = Query(9)
+    symbol: str,
+    fast: int = Query(12),
+    slow: int = Query(26),
+    signal: int = Query(9),
+    interval: int = 1
 ):
     symbol = symbol.upper()
     if symbol not in kline_history or not kline_history[symbol]:
         raise HTTPException(status_code=400, detail="Kline data is empty or symbol not found")
-    
-    klines = kline_history[symbol]
+
+    klines = aggregate_candles(kline_history[symbol], interval)
     closes = [float(kline[4]) for kline in klines]
     close_series = pd.Series(closes)
     
@@ -276,13 +317,14 @@ def get_arrays_endpoint(
     }
 
 @app.get("/ohlc/{symbol}")
-def get_symbol_ohlc(symbol: str):
+def get_symbol_ohlc(symbol: str, interval: int = 1):
     symbol = symbol.upper()
     with cache_lock:
         if symbol not in kline_history:
             raise HTTPException(status_code=404, detail="Symbol not found or not loaded yet")
         klines = kline_history[symbol]
 
+    klines = aggregate_candles(klines, interval)
     result = calculate_ohlc_tracker_report(klines, symbol)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
@@ -302,12 +344,14 @@ def get_symbol_ema(span: int, symbol: str):
     return JSONResponse(content=jsonable_encoder(result))
 
 @app.get("/macd/{symbol}")
-def get_symbol_macd(symbol: str):
+def get_symbol_macd(symbol: str, interval: int = 1):
     symbol = symbol.upper()
     with cache_lock:
         if symbol not in kline_history:
             raise HTTPException(status_code=404, detail="Symbol not found or not loaded yet")
         klines = kline_history[symbol]
+
+    klines = aggregate_candles(klines, interval)
 
     try:
         # arrays.py файлаас MACD массивыг татаж авна
@@ -453,12 +497,12 @@ def get_all_candles():
         return kline_history
 
 @app.get("/candles/{symbol}")
-def get_symbol_candles(symbol: str):
+def get_symbol_candles(symbol: str, interval: int = 1):
     symbol = symbol.upper()
     with cache_lock:
         if symbol in kline_history:
-            print("SERVER DATA CHECK:", kline_history[symbol][0])
-            return {"symbol": symbol, "candles": kline_history[symbol]}
+            candles = aggregate_candles(kline_history[symbol], interval)
+            return {"symbol": symbol, "candles": candles}
     raise HTTPException(status_code=404, detail="Symbol not found or not loaded yet")
     
 @app.get("/binchart", response_class=HTMLResponse)
@@ -847,7 +891,12 @@ def receive_gold_candles(data: dict):
 
 
 @app.get("/api/gold")
-def get_gold_for_backtest():
+def get_gold_for_backtest(interval: int = 1):
+    if interval not in ALLOWED_GOLD_INTERVALS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"interval must be one of {sorted(ALLOWED_GOLD_INTERVALS)} (minutes)"
+        )
     with cache_lock:
         if "GOLD" not in kline_history:
             raise HTTPException(
@@ -867,6 +916,9 @@ def get_gold_for_backtest():
             )
         )
         candle_quotes = dict(market_candle_quotes.get("GOLD", {}))
+
+    # 1m → 5m/15m aggregate. RSI/MACD-ийг тухайн интервалын candle дээр тооцоолно.
+    rows = aggregate_candles(rows, interval)
 
     try:
         macd_data = calculate_macd_arrays(rows)
@@ -919,7 +971,7 @@ def get_gold_for_backtest():
 
         return {
             "symbol": "GOLD",
-            "timeframe": "1m",
+            "timeframe": f"{interval}m",
             "count": len(candles),
             "bid": float(quote.get("bid", 0.0)),
             "ask": float(quote.get("ask", 0.0)),
