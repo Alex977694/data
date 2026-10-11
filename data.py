@@ -932,3 +932,44 @@ def get_gold_for_backtest():
             status_code=500,
             detail=str(e)
         )
+
+from collections import defaultdict
+from threading import Lock
+
+request_stats = defaultdict(
+    lambda: {"count": 0, "response_bytes": 0}
+)
+request_stats_lock = Lock()
+
+@app.middleware("http")
+async def track_response_size(request, call_next):
+    response = await call_next(request)
+
+    path = request.url.path
+
+    # Хэт олон dynamic path-ийг тусад нь тоолохоос сэргийлнэ.
+    if path.startswith("/candles/"):
+        path = "/candles/{symbol}"
+    elif path.startswith("/api/gold"):
+        path = "/api/gold"
+
+    size = int(response.headers.get("content-length", 0))
+
+    with request_stats_lock:
+        request_stats[path]["count"] += 1
+        request_stats[path]["response_bytes"] += size
+
+    return response
+
+@app.get("/debug/traffic")
+def debug_traffic():
+    with request_stats_lock:
+        return {
+            path: {
+                "requests": stats["count"],
+                "response_mb": round(
+                    stats["response_bytes"] / 1024 / 1024, 2
+                )
+            }
+            for path, stats in request_stats.items()
+        }
