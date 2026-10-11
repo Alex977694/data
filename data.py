@@ -933,43 +933,83 @@ def get_gold_for_backtest():
             detail=str(e)
         )
 
-from collections import defaultdict
+from collections import defaultdict, deque
 from threading import Lock
+import time
 
-request_stats = defaultdict(
-    lambda: {"count": 0, "response_bytes": 0}
+traffic_stats = defaultdict(
+    lambda: {"requests": 0, "bytes": 0}
 )
-request_stats_lock = Lock()
+recent_requests = deque(maxlen=100)
+traffic_lock = Lock()
+
 
 @app.middleware("http")
-async def track_response_size(request, call_next):
+async def traffic_logger(request, call_next):
+    start = time.time()
     response = await call_next(request)
 
+    # Streaming бус response-ийн body-г тоолно.
+    # Streaming response-д тусгай ASGI middleware хэрэгтэй.
+    body_size = 0
+    original_iterator = response.body_iterator
+
+    async def counted_body():
+        nonlocal body_size
+        async for chunk in original_iterator:
+            if isinstance(chunk, str):
+                body_size += len(chunk.encode("utf-8"))
+            else:
+                body_size += len(chunk)
+            yield chunk
+
+    response.body_iterator = counted_body()
+
+    client_ip = (
+        request.client.host if request.client else "unknown"
+    )
+    user_agent = request.headers.get("user-agent", "unknown")
     path = request.url.path
+    status = response.status_code
 
-    # Хэт олон dynamic path-ийг тусад нь тоолохоос сэргийлнэ.
-    if path.startswith("/candles/"):
-        path = "/candles/{symbol}"
-    elif path.startswith("/api/gold"):
-        path = "/api/gold"
+    record = {
+        "time": time.strftime("%H:%M:%S"),
+        "ip": client_ip,
+        "method": request.method,
+        "path": path,
+        "status": status,
+        "user_agent": user_agent[:200],
+    }
 
-    size = int(response.headers.get("content-length", 0))
+    with traffic_lock:
+        traffic_stats[path]["requests"] += 1
+        recent_requests.append(record)
 
-    with request_stats_lock:
-        request_stats[path]["count"] += 1
-        request_stats[path]["response_bytes"] += size
+    print(
+        f"[TRAFFIC] {client_ip} "
+        f"{request.method} {path} "
+        f"status={status} "
+        f"UA={user_agent[:100]}"
+    )
 
-    return response
+    async def update_bytes():
+        pass
+
+    try:
+        return response
+    finally:
+        # Response streaming дуусахаас өмнө finally ажиллаж болох
+        # тул byte хэмжээг counted_body() дотор бүртгэх нь зөв.
+        pass
+
 
 @app.get("/debug/traffic")
 def debug_traffic():
-    with request_stats_lock:
+    with traffic_lock:
         return {
-            path: {
-                "requests": stats["count"],
-                "response_mb": round(
-                    stats["response_bytes"] / 1024 / 1024, 2
-                )
-            }
-            for path, stats in request_stats.items()
+            "by_path": {
+                path: dict(stats)
+                for path, stats in traffic_stats.items()
+            },
+            "recent_requests": list(recent_requests),
         }
