@@ -37,9 +37,14 @@ async function initMarketData() {
     const status = $("status") || document.getElementById("status");
     if(status) status.textContent = "Loading GOLD data & All Indicators from Railway...";
 
+    // Chart header дээрх #interval selector-оос минут тоог авна (1m/5m/15m).
+    // Бүх fetch-ийг нэг интервал дээр дууддаг тул candle болон indicator offset-үүд зөв таарна.
+    const intervalEl = document.getElementById("interval");
+    const intervalMin = intervalEl ? (parseInt(intervalEl.value, 10) || 1) : 1;
+
     try {
         const BASE = window.location.origin;
-        const res = await fetch(`${BASE}/api/gold`);
+        const res = await fetch(`${BASE}/api/gold?interval=${intervalMin}`);
         const data = await res.json();
 
         if (!data.candles || !Array.isArray(data.candles)) {
@@ -47,9 +52,9 @@ async function initMarketData() {
         }
 
         const [rsiRes, macdRes, ohlcRes] = await Promise.all([
-            fetch(`${BASE}/rsi/GOLD`).then(r => r.json()).catch(() => ({})),
-            fetch(`${BASE}/macd/GOLD`).then(r => r.json()).catch(() => ({})),
-            fetch(`${BASE}/ohlc/GOLD`).then(r => r.json()).catch(() => ({}))
+            fetch(`${BASE}/rsi/GOLD?interval=${intervalMin}`).then(r => r.json()).catch(() => ({})),
+            fetch(`${BASE}/macd/GOLD?interval=${intervalMin}`).then(r => r.json()).catch(() => ({})),
+            fetch(`${BASE}/ohlc/GOLD?interval=${intervalMin}`).then(r => r.json()).catch(() => ({}))
         ]);
 
         console.log("RSI Data:", rsiRes);
