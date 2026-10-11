@@ -369,8 +369,16 @@ function startLivePolling(symbol) {
         window._livePollingInFlight = true;
         try {
             const res = await fetch(`/candles/${symbol}`);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
+            if (res.status === 404) {
+                console.warn(`[LIVE POLLING] ${symbol} дата алга. Polling зогслоо.`);
+            
+                clearInterval(window._livePollingTimer);
+                window._livePollingTimer = null;
+                return;
+            }
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}`);
+            }
             const data = await res.json();
             const candles = data.candles || [];
             if (!candles.length) return;
@@ -390,7 +398,7 @@ function startLivePolling(symbol) {
         } finally {
             window._livePollingInFlight = false;
         }
-    }, 1500);
+    }, 5000);
 }
  
  async function fetchBacktest(){
