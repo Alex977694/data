@@ -309,12 +309,21 @@ document.addEventListener("DOMContentLoaded",()=>{
 
  window.redrawChart=draw;
 
+// Chart-ийн #interval selector-оос минут тоог авна (1m/5m/15m → 1/5/15)
+function currentIntervalMinutes(){
+  const el=document.getElementById("interval");
+  const v=el?el.value:"1m";
+  const n=parseInt(v,10);
+  return Number.isFinite(n)?n:1;
+}
+
 async function fetchCandles(){
  try{
-    interval = "1m"; 
+    interval = "1m";
     symbol = "GOLD";
-    
-    const candlesRes = await fetch(`/candles/${symbol}`);
+    const im = currentIntervalMinutes();
+
+    const candlesRes = await fetch(`/candles/${symbol}?interval=${im}`);
 
     if(!candlesRes.ok) throw new Error(`HTTP ${candlesRes.status}`);
     
@@ -325,26 +334,27 @@ async function fetchCandles(){
         return [Number(d[0]), Number(d[1]), Number(d[2]), Number(d[3]), Number(d[4]), Number(d[5])];
     });
 
-    await refreshIndicatorArrays(symbol);
+    await refreshIndicatorArrays(symbol, im);
     window._indicatorCandleTime = candles.length ? Number(candles[candles.length - 1][0]) : null;
 
     draw();
     dispatchChartUpdate();
 
-    startLivePolling(symbol);
+    startLivePolling(symbol, im);
 
  }catch(e){console.error("[META CHART / FLASK DATA ERROR]",e)}
 }
 
-async function refreshIndicatorArrays(symbol) {
+async function refreshIndicatorArrays(symbol, im) {
+    const intervalMin = (typeof im === "number" ? im : currentIntervalMinutes());
     const rsiPeriod = document.getElementById("rsiPeriod")?.value || "7";
     const rsiSource = document.getElementById("rsiSource")?.value || "close";
     const macdFast = document.getElementById("macdFast")?.value || "12";
     const macdSlow = document.getElementById("macdSlow")?.value || "26";
     const macdSignal = document.getElementById("macdSignal")?.value || "9";
     const [rsiRes, arraysRes] = await Promise.all([
-        fetch(`/rsi/${symbol}?period=${rsiPeriod}&source=${rsiSource}`),
-        fetch(`/arrays/${symbol}?fast=${macdFast}&slow=${macdSlow}&signal=${macdSignal}`)
+        fetch(`/rsi/${symbol}?period=${rsiPeriod}&source=${rsiSource}&interval=${intervalMin}`),
+        fetch(`/arrays/${symbol}?fast=${macdFast}&slow=${macdSlow}&signal=${macdSignal}&interval=${intervalMin}`)
     ]);
     if (!rsiRes.ok || !arraysRes.ok) {
         throw new Error(`Indicator refresh failed (RSI ${rsiRes.status}, MACD ${arraysRes.status})`);
@@ -362,23 +372,16 @@ window.refreshChartIndicators = async function(){
     draw();
 };
 
-function startLivePolling(symbol) {
+function startLivePolling(symbol, im) {
+    const intervalMin = (typeof im === "number" ? im : currentIntervalMinutes());
     if (window._livePollingTimer) clearInterval(window._livePollingTimer);
     window._livePollingTimer = setInterval(async () => {
         if (window._livePollingInFlight) return;
         window._livePollingInFlight = true;
         try {
-            const res = await fetch(`/candles/${symbol}`);
-            if (res.status === 404) {
-                console.warn(`[LIVE POLLING] ${symbol} дата алга. Polling зогслоо.`);
-            
-                clearInterval(window._livePollingTimer);
-                window._livePollingTimer = null;
-                return;
-            }
-            if (!res.ok) {
-                throw new Error(`HTTP ${res.status}`);
-            }
+            const res = await fetch(`/candles/${symbol}?interval=${intervalMin}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
             const data = await res.json();
             const candles = data.candles || [];
             if (!candles.length) return;
@@ -388,7 +391,7 @@ function startLivePolling(symbol) {
             ]);
             const latestCandleTime = Number(candles[candles.length - 1][0]);
             if (latestCandleTime !== window._indicatorCandleTime) {
-                await refreshIndicatorArrays(symbol);
+                await refreshIndicatorArrays(symbol, intervalMin);
                 window._indicatorCandleTime = latestCandleTime;
             }
             draw();
@@ -398,7 +401,7 @@ function startLivePolling(symbol) {
         } finally {
             window._livePollingInFlight = false;
         }
-    }, 5000);
+    }, 1500);
 }
  
  async function fetchBacktest(){
@@ -417,9 +420,10 @@ function startLivePolling(symbol) {
  const triggerAutoUpdate=()=>{
   clearTimeout(updateTimer);
   updateTimer=setTimeout(async()=>{
-   if(!coinEl||!intervalEl)return;
+   if(!intervalEl)return;
    interval=intervalEl.value;
-   symbol=coinEl.value.toUpperCase().replace(/[^A-Z0-9]/g,'')||"GOLD";
+   // backtest.html дээр #coin байхгүй тул GOLD-г default болгож авна.
+   symbol=(coinEl&&coinEl.value?coinEl.value.toUpperCase().replace(/[^A-Z0-9]/g,''):"")||"GOLD";
    offset=0;visibleCount=80;priceScale=1;priceOffset=0;
    await fetchCandles();
    await fetchBacktest();
