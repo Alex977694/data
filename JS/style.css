@@ -353,6 +353,31 @@ button:disabled:hover{border-color:var(--line2);color:var(--text);background:var
   background: #202a38;
 }
 
+.chart-interval-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: var(--muted, #9fb0c0);
+  margin-right: 2px;
+}
+
+.chart-interval-select {
+  min-width: 68px;
+  height: 32px;
+  padding: 0 6px;
+  background: var(--field);
+  border: 1px solid var(--line2);
+  color: var(--gold2);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chart-interval-select:hover {
+  border-color: var(--gold);
+}
+
 .chart-settings {
   align-items: center;
   flex-wrap: wrap;
