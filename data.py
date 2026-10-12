@@ -941,32 +941,33 @@ def receive_gold_candles(data: dict):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/api/gold")
-def get_gold_for_backtest(interval: int = 1):
+@app.get("/api/market/{symbol}")
+def get_market_for_backtest(symbol: str, interval: int = 1):
+    symbol = symbol.upper()
     if interval not in ALLOWED_GOLD_INTERVALS:
         raise HTTPException(
             status_code=400,
             detail=f"interval must be one of {sorted(ALLOWED_GOLD_INTERVALS)} (minutes)"
         )
     with cache_lock:
-        if "GOLD" not in kline_history:
+        if symbol not in kline_history:
             raise HTTPException(
                 status_code=404,
-                detail="GOLD candle data not loaded"
+                detail=f"{symbol} candle data not loaded"
             )
 
-        rows = list(kline_history["GOLD"])
+        rows = list(kline_history[symbol])
 
         quote = dict(
             market_quotes.get(
-                "GOLD",
+                symbol,
                 {
                     "ask": 0.0,
                     "bid": 0.0
                 }
             )
         )
-        candle_quotes = dict(market_candle_quotes.get("GOLD", {}))
+        candle_quotes = dict(market_candle_quotes.get(symbol, {}))
 
     # 1m → 5m/15m aggregate. RSI/MACD-ийг тухайн интервалын candle дээр тооцоолно.
     rows = aggregate_candles(rows, interval)
@@ -1021,7 +1022,7 @@ def get_gold_for_backtest(interval: int = 1):
             })
 
         return {
-            "symbol": "GOLD",
+            "symbol": symbol,
             "timeframe": f"{interval}m",
             "count": len(candles),
             "bid": float(quote.get("bid", 0.0)),
@@ -1030,11 +1031,17 @@ def get_gold_for_backtest(interval: int = 1):
         }
 
     except Exception as e:
-        print(f"[GOLD API ERROR] {e}")
+        print(f"[MARKET API ERROR] {symbol}: {e}")
         raise HTTPException(
             status_code=500,
             detail=str(e)
         )
+
+
+# ==================== GOLD (хуучин дуудалт — wrapper) ====================
+@app.get("/api/gold")
+def get_gold_for_backtest(interval: int = 1):
+    return get_market_for_backtest("GOLD", interval=interval)
 
 from collections import defaultdict, deque
 from threading import Lock
