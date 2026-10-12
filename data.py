@@ -51,6 +51,11 @@ WS_URL = "wss://fstream.binance.com/market/stream"
 # Chart/backtest дээр сонгож болох интервал (минут). 1m = өгөгдмөл (aggregate хийхгүй).
 ALLOWED_GOLD_INTERVALS = {1, 5, 15}
 
+# 1m/5m/15m дан доторх timestamp цоорхойг (MT5 reconnect/брокерийн хаалт) энэ
+# хязгаараас (минут) бага бол flat candle-аар дүүргэнэ. 6 цагаас их цоорхойг
+# (долоо хоногийн хаалт) дүүргэхгүй.
+MAX_GAP_FILL_MINUTES = 8 * 60  # 480 минут (6 цаг gap + хиллээсээ болсон минут + буфер)
+
 
 def aggregate_candles(klines, interval_min):
     """1m candle rows-г interval_min минут интервал болгон aggregate хийнэ.
@@ -59,9 +64,15 @@ def aggregate_candles(klines, interval_min):
     Aggregate дүрэм: O=анхны open, H=max(high), L=min(low), C=сүүлийн close, V=volume нийлбэр.
     Таймштамп нь интервалын ЭХЛЭЛ (UTC-д зөв хил拉斯ан) болно.
     """
-    if interval_min <= 1 or not klines:
+    if not klines:
         return klines
 
+    # 1m үед: timestamp цоорхойг flat candle-аар дүүргээд буцаана.
+    if interval_min <= 1:
+        return _fill_1m_gaps(klines)
+
+    # 5m/15m: эхлээд 1m цоорхойг дүүргээд aggregate хийнэ (bucket дотор зай үлдэхгүй).
+    klines = _fill_1m_gaps(klines)
     bucket_ms = interval_min * 60 * 1000
     buckets = {}
     order = []
@@ -83,7 +94,47 @@ def aggregate_candles(klines, interval_min):
             existing[4] = float(k[4])          # сүүлийн close
             existing[5] += float(k[5])          # volume нийлбэр
             existing[6] = int(k[6])             # сүүлийн close_time
-    return [buckets[b] for b in order]
+    result = [buckets[b] for b in order]
+
+    # Aggregate bucket-уудын дунд timestamp цоорхой (бүтэн 5m/15m дутуу) байвал
+    # flat bucket (O=H=L=C=өмнөх close) нэмж тасралтгүй болгоно.
+    if len(result) > 1:
+        filled = [result[0]]
+        for prev, cur in zip(result, result[1:]):
+            gap = cur[0] - prev[0]
+            if gap > bucket_ms:
+                pc = prev[4]
+                steps = (gap // bucket_ms) - 1
+                # 6 цаг (360 мин) -аас их цоорхойг (долоо хоногийн хаалт) дүүргэхгүй.
+                if gap <= MAX_GAP_FILL_MINUTES * 60 * 1000:
+                    for s in range(1, steps + 1):
+                        bt = prev[0] + s * bucket_ms
+                        filled.append([bt, pc, pc, pc, pc, 0.0, bt + bucket_ms - 1])
+            filled.append(cur)
+        result = filled
+
+    return result
+
+
+def _fill_1m_gaps(klines):
+    """1m candle-уудын дунд timestamp цоорхойг flat candle-аар дүүргэнэ."""
+    if len(klines) <= 1:
+        return klines
+
+    one_min_ms = 60 * 1000
+    filled = [list(klines[0])]
+    for prev, cur in zip(klines, klines[1:]):
+        gap = int(cur[0]) - int(prev[0])
+        if gap > one_min_ms:
+            steps = (gap // one_min_ms) - 1
+            # 6 цаг (360 мин) -аас их цоорхойг (долоо хоногийн хаалт) дүүргэхгүй.
+            if gap <= MAX_GAP_FILL_MINUTES * 60 * 1000:
+                pc = float(prev[4])
+                for s in range(1, steps + 1):
+                    bt = int(prev[0]) + s * one_min_ms
+                    filled.append([bt, pc, pc, pc, pc, 0.0, bt + one_min_ms - 1])
+        filled.append(list(cur))
+    return filled
 
 # ==================== STATE ====================
 kline_history = {}
