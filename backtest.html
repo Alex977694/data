@@ -382,7 +382,40 @@ function time(x) {
     let t = Number(x);
     if (!fin(t)) return String(x ?? "-");
     if (t < 1e11) t *= 1000;
-    return new Date(t).toISOString().replace("T", " ").replace(".000Z", "");
+    // GMT+8 (Beijing) — chart overlay болон indicatorTime()-тай нэг байдлаар харуулна.
+    return new Date(t + 8 * 60 * 60 * 1000).toISOString().replace("T", " ").replace(".000Z", "");
+}
+
+// SOURCE-д хамааруулан Account Settings-ийн контракт/левериж preset.
+// GOLD (XAU): 1 lot = 100 oz → CONTRACT 100, типик 1:100.
+// FUTURES (Binance, client.py-ийн дүрэм): 1 lot = 1 base coin → CONTRACT 1,
+//   leverage 10≤lvr≤20 (default 20), хамгийн бага lot = min_coin.
+async function applyAccountPreset() {
+    const marketEl = document.getElementById("market");
+    const source = marketEl ? marketEl.value.toUpperCase() : "GOLD";
+    const isGold = source === "GOLD";
+
+    const $ = id => document.getElementById(id);
+    const contract = $("accContract"), lev = $("accLeverage"), lot = $("accLot");
+    if (contract) contract.value = isGold ? 100 : 1;
+    if (lev) lev.value = isGold ? 100 : 20;
+    if (lot) lot.value = 0.01;
+
+    // FUTURES үед client.py-ийн дүрэмээр (min_coin / lvr) тохируулна.
+    if (!isGold) {
+        const coinEl = document.getElementById("coin");
+        const sym = coinEl && coinEl.value.trim() ? coinEl.value.trim().toUpperCase() : "";
+        if (sym) {
+            try {
+                const r = await fetch(`/api/symbol-rules/${sym}`);
+                if (r.ok) {
+                    const rules = await r.json();
+                    if (rules.min_coin > 0) lot.value = rules.min_coin;
+                    if (rules.lvr) lev.value = Math.min(20, Math.max(10, rules.lvr));
+                }
+            } catch (e) { console.error("[SYMBOL RULES ERROR]", e); }
+        }
+    }
 }
 
 const price = x => fin(Number(x)) ? Number(x).toFixed(2) : "-";
@@ -484,7 +517,8 @@ function runBacktest() {
     A.k = A.lot * A.cs;
     const acc = {
         closed: 0, peak: A.bal, maxDD: 0, minEq: A.bal, minFloat: 0, maxPos: 0,
-        minML: null, need: 0, soIndex: null, soTime: null, ddBars: 0, bars: 0, lastEq: A.bal
+        minML: null, need: 0, soIndex: null, soTime: null, ddBars: 0, bars: 0, lastEq: A.bal,
+        equityByTime: {}  // timestamp(ms) → { equity, margin, marginLevel, floating, closed, long, short }
     };
 
     function openPosition(type, c, i) {
@@ -647,6 +681,20 @@ function runBacktest() {
             acc.minFloat = Math.min(acc.minFloat, fl);
             acc.maxPos = Math.max(acc.maxPos, nl + ns);
 
+            // Chart overlay-д хэрэглэхээр candle бүрийн account төлөвийг timestamp-ээр хадгална.
+            let ot = Number(c.open_time);
+            if (!Number.isFinite(ot)) ot = 0;
+            else if (ot < 1e11) ot *= 1000;  // секунд → ms
+            acc.equityByTime[Math.floor(ot)] = {
+                equity: eq,
+                margin: margin,
+                marginLevel: margin > 0 ? (eq / margin * 100) : null,
+                floating: fl,
+                closed: acc.closed,
+                long: nl,
+                short: ns
+            };
+
             if (margin > 0) {
                 const ml = eq / margin * 100;
                 if (acc.minML === null || ml < acc.minML) { acc.minML = ml; }
@@ -662,6 +710,14 @@ function runBacktest() {
     const s = stats(trades, positions, events.length, activeCandles);
     s.acc = acc;
     s.A = A;
+    // Chart overlay-д account төлөв + тохиргоог дамжуулна (META_CHART.js canvas дээр харуулна).
+    window.chartAccountOverlay = {
+        equityByTime: acc.equityByTime,
+        settings: { bal: A.bal, lev: A.lev, lot: A.lot, cs: A.cs, so: A.so },
+        finalEquity: acc.lastEq,
+        closed: acc.closed,
+        stopOutIndex: acc.soIndex
+    };
     render(count, trades, events, s);
 }
 
@@ -837,7 +893,7 @@ window.addEventListener("DOMContentLoaded", async () => {
         // META_CHART.js chart-ийг, энд window.candles + backtest snapshot-ийг шинэчилнэ.
         const marketEl = document.getElementById("market");
         if (marketEl) {
-            marketEl.addEventListener("change", () => loadInitialData());
+            marketEl.addEventListener("change", async () => { await applyAccountPreset(); loadInitialData(); });
         }
         const coinEl = document.getElementById("coin");
         if (coinEl) {
