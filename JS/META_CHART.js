@@ -317,11 +317,23 @@ function currentIntervalMinutes(){
   return Number.isFinite(n)?n:1;
 }
 
+// SOURCE (GOLD/FUTURES) + ticker (#coin) → символ. FUTURES үед coin, бусад тохиолдолд GOLD.
+function currentSymbol(){
+  const marketEl=document.getElementById("market");
+  const coinEl=document.getElementById("coin");
+  const source=marketEl?marketEl.value.toUpperCase():"GOLD";
+  if(source==="FUTURES"){
+    const c=coinEl&&coinEl.value.trim()?coinEl.value.trim().toUpperCase().replace(/[^A-Z0-9]/g,''):"";
+    return c||"GOLD";
+  }
+  return "GOLD";
+}
+
 async function fetchCandles(){
  try{
-    interval = "1m";
-    symbol = "GOLD";
+    symbol = currentSymbol();
     const im = currentIntervalMinutes();
+    interval = im + "m";
 
     const candlesRes = await fetch(`/candles/${symbol}?interval=${im}`);
 
@@ -422,20 +434,26 @@ function startLivePolling(symbol, im) {
   updateTimer=setTimeout(async()=>{
    if(!intervalEl)return;
    interval=intervalEl.value;
-   // backtest.html дээр #coin байхгүй тул GOLD-г default болгож авна.
-   symbol=(coinEl&&coinEl.value?coinEl.value.toUpperCase().replace(/[^A-Z0-9]/g,''):"")||"GOLD";
    offset=0;visibleCount=80;priceScale=1;priceOffset=0;
    await fetchCandles();
    await fetchBacktest();
   },150);
  };
 
- if(marketEl)marketEl.addEventListener("change",triggerAutoUpdate);
+ // SOURCE=GOLD үед ticker input-ыг нуух, FUTURES үед харуулах
+ const syncCoinVisibility=()=>{
+  if(!coinEl)return;
+  const src=marketEl?marketEl.value.toUpperCase():"GOLD";
+  coinEl.style.display = src==="FUTURES" ? "inline-block" : "none";
+ };
+
+ if(marketEl)marketEl.addEventListener("change",()=>{syncCoinVisibility();triggerAutoUpdate();});
  if(intervalEl)intervalEl.addEventListener("change",triggerAutoUpdate);
  if(coinEl){
   coinEl.addEventListener("change",triggerAutoUpdate);
   coinEl.addEventListener("keydown",e=>{if(e.key==="Enter")triggerAutoUpdate()});
  }
+ syncCoinVisibility();
 
  /* ▲ ■ ▼ товчлуурууд */
   const panels=[
