@@ -19,10 +19,13 @@ function formatPrice(p){
 
 const pad2=n=>String(n).padStart(2,"0");
 const finNum=v=>Number.isFinite(Number(v))?Number(v):null;
-const TZ8_OFFSET=8*60*60*1000; // GMT+8 (Beijing) — Gold + Crypto бүгд энэ бүсэд харагдана
+const TZ8_OFFSET=8*60*60*1000; // GMT+8 (Beijing) — FUTURES (Binance UTC) дээр л нэмнэ
 
 function timeLabel(ts,interval){
- const d=new Date(ts+TZ8_OFFSET); // UTC ms-д 8 цаг нэмээд UTC getter-ээр уншивал GMT+8 гарна
+ // GOLD (MT5) өөрөө зөв цагтай (бүс нэмэхгүй); FUTURES (Binance UTC) → GMT+8.
+ const src=(document.getElementById("market")?.value||"GOLD").toUpperCase();
+ const offset=src==="GOLD"?0:TZ8_OFFSET;
+ const d=new Date(ts+offset);
  if(/[dwM]$/.test(interval))
   return d.toLocaleDateString("en-GB",{timeZone:"UTC",year:"numeric",month:"2-digit",day:"2-digit"});
  return pad2(d.getUTCHours())+":"+pad2(d.getUTCMinutes());
