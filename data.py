@@ -941,6 +941,60 @@ def receive_gold_candles(data: dict):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/symbol-rules/{symbol}")
+def get_symbol_rules_endpoint(symbol: str):
+    """Binance Futures symbol-ийн дүрэм (client.py-тэй ижил тооцоолол).
+
+    Буцаана: lvr, step_size, min_qty, min_notional, current_price, min_coin, min_usdt.
+    Public endpoint-уудээр (exchange_info + ticker_price) тооцоологдоно тул API key шаардлагагүй
+    (Railway дээр ч ажиллана). lvr нь client.py-ийн default 20 (10≤lvr≤20).
+    """
+    import math
+    symbol = symbol.upper()
+    try:
+        client = UMFutures()
+        client.session.requests_params = {"timeout": 10}
+        all_info = client.exchange_info()
+        symbol_info = next((s for s in all_info["symbols"] if s["symbol"] == symbol), None)
+        if not symbol_info:
+            raise HTTPException(status_code=404, detail=f"Exchange info for {symbol} not found")
+
+        filters = {f["filterType"]: f for f in symbol_info.get("filters", [])}
+        lot_size = filters.get("LOT_SIZE", {})
+        step_size = float(lot_size.get("stepSize", 0))
+        min_qty = float(lot_size.get("minQty", 0))
+        min_notional = float(filters.get("MIN_NOTIONAL", {}).get("notional", 5.0))
+        lvr = 20  # default (client.py: 10≤lvr≤20; leverage_brackets API key шаарддаг тул default 20)
+
+        try:
+            price = float(client.ticker_price(symbol=symbol)["price"])
+        except Exception:
+            price = 0.0
+
+        # min_coin = max(min_qty, ceil(min_notional/price/step)*step) — client.py-тэй ижил.
+        effective_min_coin = min_qty
+        if price > 0 and min_notional > 0:
+            qty_for_notional = min_notional / price
+            if step_size > 0:
+                qty_for_notional = math.ceil(qty_for_notional / step_size) * step_size
+            effective_min_coin = max(min_qty, qty_for_notional)
+
+        return {
+            "symbol": symbol,
+            "lvr": lvr,
+            "step_size": step_size,
+            "min_qty": min_qty,
+            "min_notional": min_notional,
+            "current_price": price,
+            "min_coin": effective_min_coin,
+            "min_usdt": effective_min_coin * price
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @app.get("/api/market/{symbol}")
 def get_market_for_backtest(symbol: str, interval: int = 1):
     symbol = symbol.upper()
