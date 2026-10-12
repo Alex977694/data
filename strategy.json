@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "strategy_name": "GOLD 1M RSI Reversion + MACD Trend",
+  "positionMode": {
+    "LONG": "SINGLE",
+    "SHORT": "SINGLE"
+  },
+  "maxPositions": {
+    "LONG": 1,
+    "SHORT": 1
+  },
+  "limitTrail": {
+    "LONG": false,
+    "SHORT": false
+  },
+  "limitTrailReset": {
+    "LONG": false,
+    "SHORT": false
+  },
+  "indicators": {
+    "rsiPeriod": 7,
+    "rsiSource": "close",
+    "macdFast": 12,
+    "macdSlow": 26,
+    "macdSignal": 9,
+    "atrPeriod": 0
+  },
+  "conditions": {
+    "longOpen": [
+      {
+        "left": "30_up",
+        "operator": "==",
+        "rightType": "text",
+        "right": "UP",
+        "logic": "AND",
+        "readyClose": false
+      },
+      {
+        "left": "macd_up",
+        "operator": "==",
+        "rightType": "text",
+        "right": "true",
+        "logic": "AND",
+        "readyClose": false
+      },
+      {
+        "left": "candle_close_0",
+        "operator": ">",
+        "rightType": "value",
+        "right": "candle_open_0",
+        "logic": "AND",
+        "readyClose": false
+      }
+    ],
+    "longReset": [],
+    "longExit": [
+      {
+        "left": "rsi0",
+        "operator": ">",
+        "rightType": "number",
+        "right": "55",
+        "logic": "AND",
+        "readyClose": false
+      },
+      {
+        "left": "candle_close_0",
+        "operator": "<",
+        "rightType": "long_limit",
+        "right": "LONG_LIMIT",
+        "logic": "OR",
+        "readyClose": false
+      }
+    ],
+    "longReadyClose": [],
+    "longLimitTrailArm": [],
+    "longLimitTrail": [],
+    "shortOpen": [
+      {
+        "left": "70_down",
+        "operator": "==",
+        "rightType": "text",
+        "right": "DOWN",
+        "logic": "AND",
+        "readyClose": false
+      },
+      {
+        "left": "macd_down",
+        "operator": "==",
+        "rightType": "text",
+        "right": "true",
+        "logic": "AND",
+        "readyClose": false
+      },
+      {
+        "left": "candle_close_0",
+        "operator": "<",
+        "rightType": "value",
+        "right": "candle_open_0",
+        "logic": "AND",
+        "readyClose": false
+      }
+    ],
+    "shortReset": [],
+    "shortExit": [
+      {
+        "left": "rsi0",
+        "operator": "<",
+        "rightType": "number",
+        "right": "45",
+        "logic": "AND",
+        "readyClose": false
+      },
+      {
+        "left": "candle_close_0",
+        "operator": ">",
+        "rightType": "short_limit",
+        "right": "SHORT_LIMIT",
+        "logic": "OR",
+        "readyClose": false
+      }
+    ],
+    "shortReadyClose": [],
+    "shortLimitTrailArm": [],
+    "shortLimitTrail": []
+  }
+}

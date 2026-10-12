@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "strategy_name": "GOLD 1M Hedge Strategy",
+  "positionMode": {
+    "LONG": "SINGLE",
+    "SHORT": "SINGLE"
+  },
+  "maxPositions": {
+    "LONG": 1,
+    "SHORT": 1
+  },
+  "limitTrail": {
+    "LONG": false,
+    "SHORT": false
+  },
+  "limitTrailReset": {
+    "LONG": false,
+    "SHORT": false
+  },
+  "indicators": {
+    "rsiPeriod": 7,
+    "rsiSource": "close",
+    "macdFast": 12,
+    "macdSlow": 26,
+    "macdSignal": 9,
+    "atrPeriod": null
+  },
+  "conditions": {
+    "longOpen": [
+      {
+        "left": "candle_close_0",
+        "operator": ">",
+        "rightType": "value",
+        "right": "candle_close_1",
+        "logic": "AND",
+        "readyClose": false
+      }
+    ],
+    "longReset": [],
+    "longExit": [
+      {
+        "left": "candle_close_0",
+        "operator": "<",
+        "rightType": "value",
+        "right": "candle_close_1",
+        "logic": "AND",
+        "readyClose": false
+      }
+    ],
+    "longReadyClose": [],
+    "longLimitTrailArm": [],
+    "longLimitTrail": [],
+    "shortOpen": [
+      {
+        "left": "candle_close_0",
+        "operator": "<",
+        "rightType": "value",
+        "right": "candle_close_1",
+        "logic": "AND",
+        "readyClose": false
+      }
+    ],
+    "shortReset": [],
+    "shortExit": [
+      {
+        "left": "candle_close_0",
+        "operator": ">",
+        "rightType": "value",
+        "right": "candle_close_1",
+        "logic": "AND",
+        "readyClose": false
+      }
+    ],
+    "shortReadyClose": [],
+    "shortLimitTrailArm": [],
+    "shortLimitTrail": []
+  }
+}
