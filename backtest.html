@@ -378,12 +378,19 @@ window.applyIndicators = async function() {
     }
 };
 
+// SOURCE = GOLD эсэхийг шалгах (GOLD дээр MT5 өөрөө зөв цагтай тул бүс нэмэхгүй).
+function isGoldSource() {
+    const marketEl = document.getElementById("market");
+    return !marketEl || marketEl.value.toUpperCase() === "GOLD";
+}
+
 function time(x) {
     let t = Number(x);
     if (!fin(t)) return String(x ?? "-");
     if (t < 1e11) t *= 1000;
-    // GMT+8 (Beijing) — chart overlay болон indicatorTime()-тай нэг байдлаар харуулна.
-    return new Date(t + 8 * 60 * 60 * 1000).toISOString().replace("T", " ").replace(".000Z", "");
+    // GOLD (MT5) өөрөө зөв цагтай (хөдөлгөөнгүй); FUTURES (Binance UTC) → GMT+8.
+    const offset = isGoldSource() ? 0 : 8 * 60 * 60 * 1000;
+    return new Date(t + offset).toISOString().replace("T", " ").replace(".000Z", "");
 }
 
 // SOURCE-д хамааруулан Account Settings-ийн контракт/левериж preset.
@@ -421,8 +428,10 @@ async function applyAccountPreset() {
 const price = x => fin(Number(x)) ? Number(x).toFixed(2) : "-";
 function pnl(x) { x = Number(x); return fin(x) ? (x > 0 ? "+" : "") + x.toFixed(2) : "-"; }
 
-function trade(type, et, ep, xt, xp, limit) {
-    return { type, entryTime: et, entryPrice: ep, exitTime: xt, exitPrice: xp, limit, pnl: type === "LONG" ? xp - ep : ep - xp };
+function trade(type, et, ep, xt, xp, limit, qty) {
+    const priceDiff = type === "LONG" ? xp - ep : ep - xp;
+    // pnl нь $-д (priceDiff × qty). Gold-д qty=lot×contract; FUTURES-д qty=lot/entryPrice.
+    return { type, entryTime: et, entryPrice: ep, exitTime: xt, exitPrice: xp, limit, qty, priceDiff, pnl: priceDiff * qty };
 }
 
 function getOpenLimits(i) {
@@ -512,8 +521,12 @@ function runBacktest() {
         lot: Number($("accLot").value) || 0.01,
         cs: Number($("accContract").value) || 100,
         so: Number($("accStopOut").value) || 50,
-        hedged: $("accHedged").checked
+        hedged: $("accHedged").checked,
+        isCrypto: !isGoldSource()
     };
+    // GOLD: 1 position-ийн "qty" = lot × contract (oz тоо, тогтмол).
+    // FUTURES: LOT нь нэг trade-ийн $ notional. qty = lot($) / entryPrice (coin тоо).
+    //   margin = qty × price / lev = lot / lev (жишээ: 20x дээр $10 → $0.5).
     A.k = A.lot * A.cs;
     const acc = {
         closed: 0, peak: A.bal, maxDD: 0, minEq: A.bal, minFloat: 0, maxPos: 0,
@@ -528,10 +541,14 @@ function runBacktest() {
         const trailEnabled = limitTrailEnabled[type];
         const hasArmCondition = groups[type.toLowerCase() + "LimitTrailArm"].length > 0;
 
+        // GOLD: qty = lot × contract (oz тоо). FUTURES: qty = lot($ notional) / entryPrice (coin тоо).
+        const qty = A.isCrypto ? (ep > 0 ? A.lot / ep : 0) : (A.lot * A.cs);
+
         positions[type].push({
             id: Date.now() + Math.random(), type, entryTime: et, entryPrice: ep, limit, peak: 0,
             limitTrailArmed: trailEnabled && !hasArmCondition,
-            limitTrailArmedAt: i
+            limitTrailArmedAt: i,
+            qty
         });
         events.push({ time: et, price: ep, limit, action: type + " OPEN" });
         count[type].open++;
@@ -544,8 +561,8 @@ function runBacktest() {
         if (!p) return;
         const xp = Number(type === "LONG" ? c.bid : c.ask), xt = time(c.open_time);
         events.push({ time: xt, price: xp, limit: p.limit, action: type + " CLOSE" });
-        trades.push(trade(type, p.entryTime, p.entryPrice, xt, xp, p.limit));
-        acc.closed += trades[trades.length - 1].pnl * A.k;
+        trades.push(trade(type, p.entryTime, p.entryPrice, xt, xp, p.limit, p.qty));
+        acc.closed += trades[trades.length - 1].pnl;
         count[type].close++;
         positions[type].splice(index, 1);
     }
@@ -665,11 +682,16 @@ function runBacktest() {
         {
             const bd = Number(c.bid);
             const ak = Number(c.ask);
-            const fl = (sum(positions.LONG.map(p => bd - p.entryPrice)) + sum(positions.SHORT.map(p => p.entryPrice - ak))) * A.k;
+            // Floating PnL = Σ(price_diff × qty). Gold-д qty = lot×contract; FUTURES-д qty = lot/entryPrice.
+            const fl = (sum(positions.LONG.map(p => (bd - Number(p.entryPrice)) * p.qty)) + sum(positions.SHORT.map(p => (Number(p.entryPrice) - ak) * p.qty)));
             const nl = positions.LONG.length;
             const ns = positions.SHORT.length;
-            const lots = A.hedged ? Math.max(nl, ns) : nl + ns;
-            const margin = lots * A.k * bd / A.lev;
+            // Margin = notional / leverage. FUTURES-д notional = qty×price, тиймээс margin = lot/lev.
+            const longNotional = sum(positions.LONG.map(p => p.qty * bd));
+            const shortNotional = sum(positions.SHORT.map(p => p.qty * ak));
+            const margin = A.hedged
+                ? Math.max(longNotional, shortNotional) / A.lev
+                : (longNotional + shortNotional) / A.lev;
             const eq = A.bal + acc.closed + fl;
 
             acc.bars++;
@@ -747,7 +769,7 @@ function stats(trades, pos, totalEvents, activeCandles) {
                 if (!fin(cp)) return;
                 openPositions.push({
                     type, entryTime: q.entryTime, entryPrice: q.entryPrice, limit: q.limit, currentPrice: cp,
-                    pnl: type === "LONG" ? cp - q.entryPrice : q.entryPrice - cp
+                    pnl: (type === "LONG" ? cp - q.entryPrice : q.entryPrice - cp) * q.qty
                 });
             });
         });
