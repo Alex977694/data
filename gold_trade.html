@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gold Trade — Live</title>
+    <link rel="stylesheet" href="/JS/style.css">
+</head>
+<body>
+
+    <!-- CONTROL PANEL -->
+    <div class="section">
+        <div class="section-title chart-title">
+            <span>LIVE TRADING CONTROL</span>
+        </div>
+        <div class="row">
+            <label class="chart-interval-label" for="market">SRC:</label>
+            <select id="market" class="chart-interval-select" title="Data source">
+                <option value="GOLD" selected>GOLD</option>
+                <option value="FUTURES">FUTURES</option>
+            </select>
+            <input id="coin" type="text" class="chart-interval-select chart-coin-input"
+                   value="BTCUSDT" placeholder="BTCUSDT" autocomplete="off"
+                   title="Ticker (FUTURES үед ажиллана)" style="display:none;" />
+            <label class="chart-interval-label" for="interval">TIME:</label>
+            <select id="interval" class="chart-interval-select" title="Candle interval">
+                <option value="1m" selected>1m</option>
+                <option value="5m">5m</option>
+                <option value="15m">15m</option>
+            </select>
+        </div>
+        <div class="row">
+            <button id="updateBtn" class="run">UPDATE</button>
+            <button id="startBtn" class="run">START</button>
+            <button id="stopBtn" class="run">STOP</button>
+        </div>
+        <div class="preview">
+            UPDATE → backtest-тэй ижил strategy/condition + data татах. START → live арилжаа эхлэх (client.py-аар ордер).
+            STOP → арилжаа зогсоох. Backtest код засахгүй — зөвхөн энд худалдаа хийнэ.
+        </div>
+    </div>
+
+    <!-- STATUS -->
+    <div class="section">
+        <div class="section-title">STATUS</div>
+        <div class="stats" id="liveStats"></div>
+        <div id="liveNote" class="preview"></div>
+    </div>
+
+    <!-- TRADE LOG -->
+    <div class="section">
+        <div class="section-title">TRADE LOG</div>
+        <div id="liveLog" class="log" style="max-height:320px;overflow-y:auto;"></div>
+    </div>
+
+    <!-- Backtest-ийн condition/data логик (хуваалцсан — initMarketData, evalGroup, val, groups) -->
+    <script src="/JS/condition.js"></script>
+    <!-- Live trading logic -->
+    <script src="/JS/gold_trade.js"></script>
+</body>
+</html>
