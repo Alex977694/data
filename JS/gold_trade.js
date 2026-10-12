@@ -115,16 +115,23 @@ function evaluateSignal() {
 async function executeOrder(signal) {
     const symbol = currentSymbol();
     const im = currentInterval();
-    log(`SIGNAL: ${signal.action} ${signal.side} → сервер рүү илгээж байна...`);
+    // GOLD → MT5 bridge (серверээр дамжин mt5_bridge.py гүйцэтгэнэ); FUTURES → Binance (client.py).
+    const useMT5 = isGoldSource();
+    const endpoint = useMT5 ? `/api/mt5/signal` : `/api/live/order`;
+    log(`SIGNAL: ${signal.action} ${signal.side} → ${useMT5 ? "MT5" : "Binance"} рүү илгээж байна...`);
     try {
-        const res = await fetch(`/api/live/order`, {
+        const res = await fetch(endpoint, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ symbol, side: signal.side, action: signal.action, interval: im })
         });
         const r = await res.json();
         if (r.status === "success") {
-            log(`✅ ORDER OK: ${signal.action} ${signal.side}`, "success");
+            if (useMT5) {
+                log(`✅ MT5 SIGNAL QUEUED: ${signal.action} ${signal.side} (mt5_bridge гүйцэтгэнэ)`, "success");
+            } else {
+                log(`✅ ORDER OK: ${signal.action} ${signal.side}`, "success");
+            }
             if (signal.action === "OPEN") positions[signal.side].push({ entryTime: Date.now() });
             else positions[signal.side] = [];
             refreshStatus();

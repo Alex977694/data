@@ -855,6 +855,69 @@ async def live_order(req: dict):
         return {"status": "error", "message": str(e)}
 
 
+# ==================== MT5 ORDER QUEUE (сервер → MT5 bridge → MT5) ====================
+# gold_trade.js signal-ийг хадгална; mt5_bridge.py poll хийн гүйцэтгэнэ.
+mt5_pending_orders = []
+mt5_orders_lock = threading.Lock()
+MT5_MAX_QUEUE = 200
+
+
+@app.post("/api/mt5/signal")
+async def mt5_signal(req: dict):
+    """gold_trade.js-аас ирсэн signal-ийг MT5 pending order болгон хадгална."""
+    action = str(req.get("action", "OPEN")).upper()
+    side = str(req.get("side", "LONG")).upper()
+    if action not in ("OPEN", "CLOSE"):
+        return {"status": "error", "message": "action must be OPEN or CLOSE"}
+    if side not in ("LONG", "SHORT"):
+        return {"status": "error", "message": "side must be LONG or SHORT"}
+    with mt5_orders_lock:
+        order = {
+            "id": int(time.time() * 1000),
+            "action": action,
+            "side": side,
+            "symbol": str(req.get("symbol", "GOLD")).upper(),
+            "lot": float(req.get("lot", 0.01) or 0.01),
+            "status": "pending"
+        }
+        mt5_pending_orders.append(order)
+        if len(mt5_pending_orders) > MT5_MAX_QUEUE:
+            mt5_pending_orders[:] = mt5_pending_orders[-MT5_MAX_QUEUE:]
+    print(f"[MT5 SIGNAL] {action} {side} {order['symbol']} lot={order['lot']}")
+    return {"status": "success", "order": order}
+
+
+@app.get("/api/mt5/orders")
+def mt5_get_orders():
+    """MT5 bridge poll хийнэ — pending order-уудыг авч 'sent' болгоно."""
+    with mt5_orders_lock:
+        pending = [o for o in mt5_pending_orders if o["status"] == "pending"]
+        for o in pending:
+            o["status"] = "sent"
+    return {"status": "success", "orders": pending}
+
+
+@app.post("/api/mt5/result")
+async def mt5_result(req: dict):
+    """MT5 bridge гүйцэтгэлийн хариуг илгээнэ (done / error)."""
+    order_id = req.get("id")
+    with mt5_orders_lock:
+        for o in mt5_pending_orders:
+            if o["id"] == order_id:
+                o["status"] = str(req.get("status", "done"))
+                o["result"] = req.get("result")
+    return {"status": "success"}
+
+
+@app.get("/api/mt5/status")
+def mt5_order_status():
+    """Хяналт: pending тоо + сүүлийн 10 order."""
+    with mt5_orders_lock:
+        pending = len([o for o in mt5_pending_orders if o["status"] == "pending"])
+        recent = mt5_pending_orders[-10:]
+    return {"status": "success", "pending": pending, "recent": recent}
+
+
 # ==================== ENTRY POINT ====================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
