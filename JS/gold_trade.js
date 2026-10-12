@@ -1,3 +1,5 @@
+// IIFE-д хийж condition.js-тэй ($, positions гэх мэт) global scope мөргүйлдэхгүй болгосон.
+(function(){
 "use strict";
 const $ = id => document.getElementById(id);
 
@@ -222,3 +224,4 @@ window.addEventListener("DOMContentLoaded", async () => {
     log("Gold Trade Live. UPDATE дараад стратеги/дата татаж аваарай.");
     await updateData();
 });
+})();
