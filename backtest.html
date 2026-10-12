@@ -113,6 +113,22 @@ ADD RANGE
         <span>META CHART</span>
 
         <div class="chart-tools">
+            <label class="chart-interval-label" for="market" title="Data source">SRC:</label>
+            <select id="market" class="chart-interval-select" title="Data source">
+                <option value="GOLD" selected>GOLD</option>
+                <option value="FUTURES">FUTURES</option>
+            </select>
+            <input
+                id="coin"
+                type="text"
+                class="chart-interval-select chart-coin-input"
+                list="coin-list"
+                value="BTCUSDT"
+                placeholder="BTCUSDT"
+                autocomplete="off"
+                title="Ticker (FUTURES үед ажиллана)"
+                style="display:none;" />
+            <datalist id="coin-list"></datalist>
             <label class="chart-interval-label" for="interval" title="Candle interval">TIME:</label>
             <select id="interval" class="chart-interval-select" title="Candle interval">
                 <option value="1m" selected>1m</option>
@@ -436,7 +452,7 @@ function updateRangeUI() {
 
 function runBacktest() {
     const allCandles = getCandles();
-    if (!allCandles.length) return alert("No GOLD candle data loaded.");
+    if (!allCandles.length) return alert("No candle data loaded. Check SOURCE and try again.");
 
     const range = getBacktestRange();
     const activeCandles = allCandles.slice(range.start, range.end);
@@ -815,6 +831,18 @@ window.addEventListener("DOMContentLoaded", async () => {
             intervalEl.addEventListener("change", () => {
                 loadInitialData();
             });
+        }
+
+        // SOURCE (GOLD/FUTURES) эсвэл ticker (#coin) солигдоход дата дахин ачааллагдана.
+        // META_CHART.js chart-ийг, энд window.candles + backtest snapshot-ийг шинэчилнэ.
+        const marketEl = document.getElementById("market");
+        if (marketEl) {
+            marketEl.addEventListener("change", () => loadInitialData());
+        }
+        const coinEl = document.getElementById("coin");
+        if (coinEl) {
+            coinEl.addEventListener("change", () => loadInitialData());
+            coinEl.addEventListener("keydown", e => { if (e.key === "Enter") loadInitialData(); });
         }
     } catch (error) {
         console.error("INITIALIZATION ERROR:", error);
