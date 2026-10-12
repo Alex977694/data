@@ -35,16 +35,24 @@ function refreshGroups() {
 
 async function initMarketData() {
     const status = $("status") || document.getElementById("status");
-    if(status) status.textContent = "Loading GOLD data & All Indicators from Railway...";
+    if(status) status.textContent = "Loading data & All Indicators from Railway...";
 
     // Chart header дээрх #interval selector-оос минут тоог авна (1m/5m/15m).
     // Бүх fetch-ийг нэг интервал дээр дууддаг тул candle болон indicator offset-үүд зөв таарна.
     const intervalEl = document.getElementById("interval");
     const intervalMin = intervalEl ? (parseInt(intervalEl.value, 10) || 1) : 1;
 
+    // SOURCE selector (GOLD / FUTURES) + ticker (#coin). FUTURES үед coin-г авна.
+    const marketEl = document.getElementById("market");
+    const coinEl = document.getElementById("coin");
+    const source = marketEl ? marketEl.value.toUpperCase() : "GOLD";
+    const symbol = (source === "FUTURES" && coinEl && coinEl.value.trim())
+        ? coinEl.value.trim().toUpperCase()
+        : "GOLD";
+
     try {
         const BASE = window.location.origin;
-        const res = await fetch(`${BASE}/api/gold?interval=${intervalMin}`);
+        const res = await fetch(`${BASE}/api/market/${symbol}?interval=${intervalMin}`);
         const data = await res.json();
 
         if (!data.candles || !Array.isArray(data.candles)) {
@@ -52,9 +60,9 @@ async function initMarketData() {
         }
 
         const [rsiRes, macdRes, ohlcRes] = await Promise.all([
-            fetch(`${BASE}/rsi/GOLD?interval=${intervalMin}`).then(r => r.json()).catch(() => ({})),
-            fetch(`${BASE}/macd/GOLD?interval=${intervalMin}`).then(r => r.json()).catch(() => ({})),
-            fetch(`${BASE}/ohlc/GOLD?interval=${intervalMin}`).then(r => r.json()).catch(() => ({}))
+            fetch(`${BASE}/rsi/${symbol}?interval=${intervalMin}`).then(r => r.json()).catch(() => ({})),
+            fetch(`${BASE}/macd/${symbol}?interval=${intervalMin}`).then(r => r.json()).catch(() => ({})),
+            fetch(`${BASE}/ohlc/${symbol}?interval=${intervalMin}`).then(r => r.json()).catch(() => ({}))
         ]);
 
         console.log("RSI Data:", rsiRes);
