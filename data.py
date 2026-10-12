@@ -753,6 +753,108 @@ def start_background_daemon():
     threading.Thread(target=status_monitor, daemon=True).start()
     start_websocket(symbols)
     
+# ==================== LIVE TRADING (GOLD / CRYPTO) ====================
+# Backtest-ийн condition/data-ийг хуваалцдаг, гэхдээ backtest логик засахгүй.
+# Frontend (gold_trade.js) нь condition.js-ийн evalGroup/val-аар сигнал гаргаж,
+# энд /api/live/order руу илгээж client.py-аар ордер гүйцэтгэнэ.
+live_trading_state = {
+    "running": False,
+    "symbol": "GOLD",
+    "started_at": None
+}
+live_trading_lock = threading.Lock()
+
+
+@app.get("/api/strategy")
+def get_strategy_json():
+    """Backtest-тэй ижил strategy/condition JSON (gold_trade.html UPDATE дээр ашиглана)."""
+    for fname in ("strategy.json", "cond1.json"):
+        try:
+            with open(fname, "r", encoding="utf-8") as f:
+                return JSONResponse(content=json.load(f))
+        except FileNotFoundError:
+            continue
+    raise HTTPException(status_code=404, detail="strategy.json / cond1.json олдсонгүй")
+
+
+@app.get("/gold-trade", response_class=HTMLResponse)
+def gold_trade_page():
+    try:
+        with open("gold_trade.html", "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="gold_trade.html файл олдсонгүй!")
+
+
+@app.get("/api/live/status")
+def live_status():
+    with live_trading_lock:
+        return {
+            "status": "success",
+            "running": live_trading_state["running"],
+            "symbol": live_trading_state["symbol"],
+            "started_at": live_trading_state["started_at"]
+        }
+
+
+@app.post("/api/live/start")
+async def live_start(req: dict):
+    with live_trading_lock:
+        if live_trading_state["running"]:
+            return {"status": "already_running", "running": True}
+        live_trading_state["running"] = True
+        live_trading_state["symbol"] = str(req.get("symbol", "GOLD")).upper()
+        live_trading_state["started_at"] = datetime.now(timezone.utc).isoformat()
+        sym = live_trading_state["symbol"]
+    return {"status": "success", "running": True, "symbol": sym}
+
+
+@app.post("/api/live/stop")
+async def live_stop():
+    with live_trading_lock:
+        live_trading_state["running"] = False
+        live_trading_state["started_at"] = None
+    return {"status": "success", "running": False}
+
+
+@app.post("/api/live/order")
+async def live_order(req: dict):
+    """client.py-аар Binance Futures ордер гүйцэтгэнэ.
+    req = { symbol, side (LONG/SHORT), action (OPEN/CLOSE), qty }
+    """
+    symbol = str(req.get("symbol", "GOLD")).upper()
+    side = str(req.get("side", "LONG")).upper()
+    action = str(req.get("action", "OPEN")).upper()
+    qty = float(req.get("qty", 0) or 0)
+    if side not in ("LONG", "SHORT"):
+        return {"status": "error", "message": "side must be LONG or SHORT"}
+    if action not in ("OPEN", "CLOSE"):
+        return {"status": "error", "message": "action must be OPEN or CLOSE"}
+    try:
+        import client as bc
+        cl = bc.get_client()
+        if not cl:
+            return {"status": "error", "message": "No Binance API client (BINANCE_API_KEY/SECRET тохируулаагүй)"}
+        info = bc.get_symbol_rules(cl, symbol)
+        if not info:
+            return {"status": "error", "message": f"Could not get rules for {symbol}"}
+        if action == "OPEN":
+            if side == "LONG":
+                result = bc.open_long_position(cl, symbol, info)
+            else:
+                result = bc.open_short_position(cl, symbol, info)
+        else:
+            if qty <= 0:
+                qty = info.get("min_coin", 0)
+            if side == "LONG":
+                result = bc.close_long_position(cl, symbol, qty, info)
+            else:
+                result = bc.close_short_position(cl, symbol, qty, info)
+        return {"status": "success", "symbol": symbol, "side": side, "action": action, "result": result}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
 # ==================== ENTRY POINT ====================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
