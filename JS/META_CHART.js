@@ -19,9 +19,10 @@ function formatPrice(p){
 
 const pad2=n=>String(n).padStart(2,"0");
 const finNum=v=>Number.isFinite(Number(v))?Number(v):null;
+const TZ8_OFFSET=8*60*60*1000; // GMT+8 (Beijing) — Gold + Crypto бүгд энэ бүсэд харагдана
 
 function timeLabel(ts,interval){
- const d=new Date(ts);
+ const d=new Date(ts+TZ8_OFFSET); // UTC ms-д 8 цаг нэмээд UTC getter-ээр уншивал GMT+8 гарна
  if(/[dwM]$/.test(interval))
   return d.toLocaleDateString("en-GB",{timeZone:"UTC",year:"numeric",month:"2-digit",day:"2-digit"});
  return pad2(d.getUTCHours())+":"+pad2(d.getUTCMinutes());
@@ -40,6 +41,23 @@ function drawLabels(ctx,x,y,items){
   x+=ctx.measureText(val+"  ").width;
  });
 }
+
+/* Account overlay-г 2 мөрөнд зурна (мөр бүрэнд 3 label). */
+function drawAccountOverlay(ctx,x,y,items){
+  ctx.font="11px Arial";
+  ctx.textBaseline="top";
+  const perRow=3;
+  for(let i=0;i<items.length;i+=perRow){
+   let cx=x;
+   const yy=y+Math.floor(i/perRow)*14;
+   for(let j=0;j<perRow&&i+j<items.length;j++){
+    const [label,val,color]=items[i+j];
+    ctx.fillStyle="#888";ctx.fillText(label,cx,yy);cx+=ctx.measureText(label).width;
+    ctx.fillStyle=color||"#fff";ctx.fillText(val+"  ",cx,yy);cx+=ctx.measureText(val+"  ").width;
+   }
+  }
+}
+
 
 /* mouse-ийн доорх candle-ийн index (хэрэв chart дотор биш бол сүүлийн candle) */
 function activeIndex(m,padding,chartWidth,candleWidth,len){
@@ -302,6 +320,33 @@ document.addEventListener("DOMContentLoaded",()=>{
    ["L:",formatPrice(ac[3])],
    ["C:",formatPrice(ac[4]),cc]
   ]);
+
+  /* ACCOUNT OVERLAY (backtest-ийн дүн) — тухайн candle-ийн equity/margin */
+  const ov=window.chartAccountOverlay;
+  if(ov&&ov.equityByTime){
+   let ts=Number(ac[0]);
+   if(!Number.isFinite(ts))ts=0;
+   // GOLD (MT5) секунд, crypto (Binance) ms → ms-д хөрвүүлж, хоёр хэлбэрийг туршиж хайна.
+   const tsMs=ts<1e11?ts*1000:ts;
+   let snap=ov.equityByTime[Math.floor(tsMs)]||ov.equityByTime[tsMs]
+        ||ov.equityByTime[Math.floor(ts)]||ov.equityByTime[ts];
+   if(snap){
+    const pnlCol=(snap.floating>=0)?"#0ecb81":"#f6465d";
+    const items=[
+     ["EQUITY:",("$"+snap.equity.toFixed(2)),"#f0b90b"],
+     ["CLOSED P/L:",((snap.closed>=0?"+":"")+snap.closed.toFixed(2)),(snap.closed>=0)?"#0ecb81":"#f6465d"],
+     ["FLOATING:",((snap.floating>=0?"+":"")+snap.floating.toFixed(2)),pnlCol],
+     ["LONG:",String(snap.long),"#0ecb81"],
+     ["SHORT:",String(snap.short),"#f6465d"]
+    ];
+    if(snap.marginLevel!==null){
+     const mlCol=snap.marginLevel<=ov.settings.so?"#f6465d":(snap.marginLevel<200?"#f0b90b":"#fff");
+     items.push(["MARGIN LEVEL:",snap.marginLevel.toFixed(0)+"%",mlCol]);
+    }
+    // OHLC-ийн доор 2 мөрөнд account overlay.
+    drawAccountOverlay(ctx,padding+10,padding+20,items);
+   }
+  }
 
     if(showMacd)drawMACD(ctx,data,window.macdArrayData,window.signalArrayData,window.histArrayData,padding,chartWidth,chartHeight,candleWidth,mouse,mainChartHeight,macdRatio);
     if(showRsi)drawRSI(ctx,data,window.rsiArrayData,padding,chartWidth,chartHeight,candleWidth,mouse,mainChartHeight,macdRatio,rsiRatio);
