@@ -865,6 +865,7 @@ function updateLimitTrailVisibility(side) {
 
 function buildGroups() {
  const root = $("groups");
+ if(!root) return;  // gold_trade.html дээр #groups байхгүй тул guard (backtest дээр #groups байдаг)
  root.innerHTML = "";
 
  [
