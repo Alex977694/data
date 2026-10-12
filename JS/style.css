@@ -378,6 +378,19 @@ button:disabled:hover{border-color:var(--line2);color:var(--text);background:var
   border-color: var(--gold);
 }
 
+.chart-coin-input {
+  min-width: 96px;
+  width: 96px;
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: .02em;
+}
+
+.chart-coin-input::placeholder {
+  color: #6b7a88;
+  font-weight: 500;
+}
+
 .chart-settings {
   align-items: center;
   flex-wrap: wrap;
