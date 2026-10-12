@@ -99,7 +99,11 @@ async function initMarketData() {
             let timestamp = Number(candle?.open_time);
             if (!Number.isFinite(timestamp)) return null;
             if (timestamp < 1e11) timestamp *= 1000;
-            return new Date(timestamp + 8 * 60 * 60 * 1000).toISOString().replace("T", " ").slice(0, 19);
+            // GOLD (MT5) өөрөө зөв цагтай; FUTURES (Binance UTC) → GMT+8.
+            const marketEl = document.getElementById("market");
+            const isGold = !marketEl || marketEl.value.toUpperCase() === "GOLD";
+            const offset = isGold ? 0 : 8 * 60 * 60 * 1000;
+            return new Date(timestamp + offset).toISOString().replace("T", " ").slice(0, 19);
         };
         let lastRsiStatus = "None";
         let lastRsiStatusTime = null;
