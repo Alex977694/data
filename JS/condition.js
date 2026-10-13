@@ -458,6 +458,9 @@ const OHLC_CANDLE_KEYS = [];
 addKeys("OHLC", "number", [...OHLC_CANDLE_KEYS, "min_open", "max_open", "min_close", "max_close", "max_high", "min_low"]);
 addKeys("OHLC", "bool", ["openup", "opendown"]);
 addKeys("OHLC", "number", ["openup_limit", "opendown_limit"]);
+// ---- CUMULATIVE WEIGHT ( calculate_cumulative_weight / /ohlc/{symbol} ) ----
+addKeys("OHLC", "number", ["cumulative_weight_float", "cumulative_weight", "latest_bar_weight"]);
+addKeys("OHLC", "bool", ["is_positive", "is_negative"]);
 
 // ---- RSI ----
 addKeys("RSI", "number", ["rsi0", "rsi1", "rsi2", "rsi3"]);
