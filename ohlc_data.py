@@ -100,6 +100,38 @@ def calculate_ohlc_tracker_report(klines, symbol="UNKNOWN", state_dict=None):
         return {"error": str(e)}
 
 
+# ==================== CUMULATIVE WEIGHT ====================
+def calculate_cumulative_weight(klines):
+    """
+    Лааны бодит биеийн жингийн (close - open) хуримтлагдсан нийлбэрийг 
+    macd.py загварын дагуу цэвэр функциональ байдлаар тооцоолох.
+    Kline формат: [time, open, high, low, close, ...]
+    """
+    if not klines or len(klines) < 2:
+        raise ValueError("At least two klines are required")
+    
+    total_weight = 0.0
+    bar_weights = []
+    
+    for kline in klines:
+        open_price = float(kline[1])
+        close_price = float(kline[4])
+        weight = close_price - open_price
+        total_weight += weight
+        bar_weights.append(weight)
+
+    latest_weight = bar_weights[-1]
+    
+    return {
+        "latest_bar_weight": f"{latest_weight:+.2f}",
+        "cumulative_weight": f"{total_weight:+.2f}",
+        "cumulative_weight_float": float(total_weight),
+        "is_positive": bool(total_weight > 0),
+        "is_negative": bool(total_weight < 0),
+    }
+
+
 __all__ = [
     "calculate_ohlc_tracker_report",
+    "calculate_cumulative_weight",
 ]
