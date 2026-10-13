@@ -379,6 +379,13 @@ def get_symbol_ohlc(symbol: str, interval: int = 1):
     result = calculate_ohlc_tracker_report(klines, symbol)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
+
+    # Cumulative weight-г тооцоолж хариултад нэмэх
+    try:
+        result.update(calculate_cumulative_weight(klines))
+    except Exception as e:
+        result["cumulative_weight_error"] = str(e)
+
     return JSONResponse(content=jsonable_encoder(result))
 
 @app.get("/ema/{span}/{symbol}")
