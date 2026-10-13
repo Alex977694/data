@@ -14,7 +14,7 @@ import requests
 import pandas as pd
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
-from ohlc_data import calculate_ohlc_tracker_report, calculate_cumulative_weight,
+from ohlc_data import calculate_ohlc_tracker_report, calculate_cumulative_weight
 from ema_data import calculate_ema_report
 from data_topmovers import calculate_top_movers_report
 from data_newmovers import calculate_new_movers_report
