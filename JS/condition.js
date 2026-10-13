@@ -137,6 +137,10 @@ async function initMarketData() {
             signal_initial_down: null
         };
 
+        // Running cumulative weight: candle бүр дээр тухайн candle хүртэлх
+        // бүх (close - open)-ийн хуримтлагдсан нийлбэрийг бодно.
+        let cumulativeWeight = 0;
+
         window.candles = data.candles.map((c, index) => {
             const rsiAt = n => seriesValue(rsiValues, n, rsiOffset);
             const macdAt = (key, n) => seriesValue(macdSeries[key], n, macdOffsets[key]);
@@ -269,6 +273,13 @@ async function initMarketData() {
 
             const indicatorFields = {};
             const ohlcWindow = data.candles.slice(Math.max(0, index - 3), index + 1);
+
+            // Тухайн candle-ийн жинг (close - open) нэмэгдүүлж, candle бүр дээр
+            // cumulative_weight-г тооцоолно (тухайн candle хүртэлх хуримтлал).
+            cumulativeWeight += Number(c.close) - Number(c.open);
+            indicatorFields.cumulative_weight = cumulativeWeight;
+            indicatorFields.cumulative_weight_float = cumulativeWeight;
+            indicatorFields.latest_bar_weight = Number(c.close) - Number(c.open);
             if (ohlcWindow.length === 4) {
                 const opens = ohlcWindow.map(item => Number(item.open));
                 const closes = ohlcWindow.map(item => Number(item.close));
