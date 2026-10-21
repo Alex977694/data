@@ -358,11 +358,24 @@ document.addEventListener("DOMContentLoaded",()=>{
  window.redrawChart=draw;
 
 // Chart-ийн #interval selector-оос минут тоог авна (1m/5m/15m → 1/5/15)
-function currentIntervalMinutes(){
-  const el=document.getElementById("interval");
-  const v=el?el.value:"1m";
-  const n=parseInt(v,10);
-  return Number.isFinite(n)?n:1;
+function currentIntervalMinutes() {
+  const el = document.getElementById("interval");
+  const v = el ? el.value.trim() : "1m";
+
+  const match = v.match(/^(\d+)(m|h|d|w)$/i);
+  if (!match) return 1;
+
+  const amount = Number(match[1]);
+  const unit = match[2].toLowerCase();
+
+  const multiplier = {
+    m: 1,
+    h: 60,
+    d: 1440,
+    w: 10080
+  };
+
+  return amount * multiplier[unit];
 }
 
 // SOURCE (GOLD/FUTURES) + ticker (#coin) → символ. FUTURES үед coin, бусад тохиолдолд GOLD.
